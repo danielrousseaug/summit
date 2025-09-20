@@ -53,3 +53,32 @@ class NoteUpdate(SQLModel):
     """Payload for updating an existing note."""
     title: Optional[str] = None
     content: Optional[str] = None
+
+
+# --- Course models ---
+
+class Course(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    title: str
+    source_filename: Optional[str] = None
+    pdf_path: Optional[str] = None
+    num_pages: Optional[int] = None
+    topics: Optional[str] = None
+    raw_text: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    status: str = Field(default="uploading")
+    status_message: Optional[str] = None
+    progress_percent: int = Field(default=0)
+
+
+class CourseRead(SQLModel):
+    id: int
+    title: str
+    source_filename: Optional[str] = None
+    num_pages: Optional[int] = None
+    topics: Optional[str] = None
+    created_at: datetime
+    status: str
+    status_message: Optional[str] = None
+    progress_percent: int
