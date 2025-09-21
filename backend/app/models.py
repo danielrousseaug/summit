@@ -82,3 +82,22 @@ class CourseRead(SQLModel):
     status: str
     status_message: Optional[str] = None
     progress_percent: int
+
+
+class Reading(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id")
+    syllabus_item_id: Optional[int] = Field(default=None)
+    order_index: int
+    title: str
+    start_page: int
+    end_page: int
+
+
+class ReadingRead(SQLModel):
+    id: int
+    syllabus_item_id: Optional[int] = None
+    order_index: int
+    title: str
+    start_page: int
+    end_page: int
