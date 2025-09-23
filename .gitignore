@@ -1,0 +1,33 @@
+# OS
+.DS_Store
+
+# Env and secrets
+.env
+.env.*.local
+backend/env_file/.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+backend/logs/
+*.log
+
+# SQLite DB
+notes.db
+
+# Uploaded files
+storage/
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker
+*.pid
