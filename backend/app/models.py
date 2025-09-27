@@ -134,3 +134,65 @@ class PDFPage(SQLModel, table=True):
     course_id: int = Field(foreign_key="course.id")
     page_number: int
     content: str
+
+
+# --- Quiz models ---
+
+class Quiz(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id")
+    syllabus_item_id: Optional[int] = Field(default=None, foreign_key="syllabusitem.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class QuizQuestion(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    quiz_id: int = Field(foreign_key="quiz.id")
+    order_index: int
+    prompt: str
+    option_a: str
+    option_b: str
+    option_c: str
+    option_d: str
+    answer_index: int
+
+
+class QuizRead(SQLModel):
+    id: int
+    course_id: int
+    syllabus_item_id: Optional[int] = None
+    syllabus_item_title: Optional[str] = None
+    created_at: datetime
+    num_questions: int
+
+
+class QuizQuestionRead(SQLModel):
+    id: int
+    order_index: int
+    prompt: str
+    options: List[str]
+
+
+class QuizDetailRead(SQLModel):
+    id: int
+    course_id: int
+    syllabus_item_id: Optional[int] = None
+    syllabus_item_title: Optional[str] = None
+    created_at: datetime
+    questions: List[QuizQuestionRead]
+
+
+class QuizSubmission(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    quiz_id: int = Field(foreign_key="quiz.id")
+    user_id: int = Field(foreign_key="user.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    score: int
+    total: int
+
+
+class QuizSubmissionRead(SQLModel):
+    id: int
+    created_at: datetime
+    score: int
+    total: int
