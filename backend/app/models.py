@@ -196,3 +196,49 @@ class QuizSubmissionRead(SQLModel):
     created_at: datetime
     score: int
     total: int
+
+
+# --- Assignments ---
+
+class Assignment(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class AssignmentQuestion(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    assignment_id: int = Field(foreign_key="assignment.id")
+    order_index: int
+    prompt: str
+    expected_keyword: str
+
+
+class AssignmentRead(SQLModel):
+    id: int
+    course_id: int
+    created_at: datetime
+    num_questions: int
+
+
+class AssignmentDetailRead(SQLModel):
+    id: int
+    course_id: int
+    created_at: datetime
+    questions: List[dict]
+
+
+class AssignmentSubmission(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    assignment_id: int = Field(foreign_key="assignment.id")
+    user_id: int = Field(foreign_key="user.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    score: int
+    total: int
+
+
+class AssignmentSubmissionRead(SQLModel):
+    id: int
+    created_at: datetime
+    score: int
+    total: int
