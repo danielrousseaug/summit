@@ -101,3 +101,36 @@ class ReadingRead(SQLModel):
     title: str
     start_page: int
     end_page: int
+
+
+from typing import List
+from datetime import date
+
+
+class SyllabusItem(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id")
+    order_index: int
+    title: str
+    summary: str
+    start_page: Optional[int] = None
+    end_page: Optional[int] = None
+    content: Optional[str] = None
+
+
+class SyllabusItemRead(SQLModel):
+    id: int
+    order_index: int
+    title: str
+    summary: str
+
+
+class CourseReadWithSyllabus(CourseRead):
+    syllabus: List[SyllabusItemRead]
+
+
+class PDFPage(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id")
+    page_number: int
+    content: str
