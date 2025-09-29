@@ -242,3 +242,27 @@ class AssignmentSubmissionRead(SQLModel):
     created_at: datetime
     score: int
     total: int
+
+
+# --- Progress tracking ---
+
+class SyllabusCompletion(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    course_id: int = Field(foreign_key="course.id")
+    syllabus_item_id: int = Field(foreign_key="syllabusitem.id")
+    completed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ProgressSummaryRead(SQLModel):
+    total_items: int
+    completed_count: int
+    completed_item_ids: List[int]
+
+
+class ReadingProgress(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    reading_id: int = Field(foreign_key="reading.id")
+    user_id: int = Field(foreign_key="user.id")
+    last_page: int
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
