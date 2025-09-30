@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,22 +24,40 @@ interface PDFViewerProps {
   onClose: () => void;
 }
 
-export default function PDFViewer({ courseId, startPage, endPage, readingId, onClose }: PDFViewerProps) {
+const PDFViewer = memo(function PDFViewer({ courseId, startPage, endPage, readingId, onClose }: PDFViewerProps) {
   const [page, setPage] = useState(startPage);
   const [totalPages, setTotalPages] = useState<number>(0);
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(true);
+  const [initialRender, setInitialRender] = useState(true);
   const pdfDocRef = useRef<any | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const debugCounterRef = useRef(0);
+
+  // Debug logging function
+  const debugLog = useCallback((message: string, data?: any) => {
+    const counter = ++debugCounterRef.current;
+    const scrollY = window.scrollY;
+    const docScrollY = document.documentElement.scrollTop;
+    console.log(`[PDF DEBUG ${counter}] ${message}`, {
+      windowScrollY: scrollY,
+      documentScrollY: docScrollY,
+      page,
+      totalPages,
+      data
+    });
+  }, [page, totalPages]);
 
   // Load PDF document
   useEffect(() => {
+    debugLog("PDFViewer mounting/courseId changed", { courseId });
     let cancelled = false;
     async function loadPdf() {
       try {
+        debugLog("Starting PDF load");
         setLoadingPdf(true);
         // Worker is already configured globally
         const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -53,8 +71,10 @@ export default function PDFViewer({ courseId, startPage, endPage, readingId, onC
         if (cancelled) return;
         pdfDocRef.current = doc;
         setTotalPages(doc.numPages);
+        debugLog("PDF loaded successfully", { numPages: doc.numPages });
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load PDF");
+        debugLog("PDF load failed", { error: e });
       } finally {
         if (!cancelled) setLoadingPdf(false);
       }
@@ -62,85 +82,64 @@ export default function PDFViewer({ courseId, startPage, endPage, readingId, onC
     loadPdf();
     return () => {
       cancelled = true;
+      debugLog("PDF load effect cleanup");
     };
-  }, [courseId]);
+  }, [courseId, debugLog]);
 
-  // Render current page
+  // Render current page - exact copy of working minimal approach
   useEffect(() => {
-    let isCancelled = false;
+    if (!pdfDocRef.current || !canvasRef.current || totalPages === 0) return;
 
-    async function renderPage() {
-      const doc = pdfDocRef.current;
-      const canvas = canvasRef.current;
-      const container = containerRef.current;
-      if (!doc || !canvas || !container || totalPages === 0 || isCancelled) return;
-
-      const current = Math.min(Math.max(page, 1), totalPages);
+    const renderPage = async () => {
       try {
-        if (!isCancelled) {
-          setRendering(true);
-        }
+        setRendering(true);
+        const doc = pdfDocRef.current;
+        const canvas = canvasRef.current;
+        if (!doc || !canvas) return;
 
-        const pdfPage = await doc.getPage(current);
-        if (isCancelled) return;
+        const pdfPage = await doc.getPage(page);
 
-        const dpr = window.devicePixelRatio || 1;
-        const initialViewport = pdfPage.getViewport({ scale: 1 });
-        const targetWidth = container.clientWidth - 32;
-        const scale = Math.min(targetWidth / initialViewport.width, 1.2);
+        // Use better scale for quality but keep simple like minimal viewer
+        const container = containerRef.current;
+        const baseScale = container ? Math.min(container.clientWidth / pdfPage.getViewport({ scale: 1 }).width, 2) : 1.5;
+        const scale = Math.max(baseScale, 1.2);
+
         const viewport = pdfPage.getViewport({ scale });
         const context = canvas.getContext("2d");
-        if (!context || isCancelled) return;
+        if (!context) return;
 
-        // Set canvas dimensions before clearing
-        const newWidth = Math.floor(viewport.width * dpr);
-        const newHeight = Math.floor(viewport.height * dpr);
-
-        if (canvas.width !== newWidth || canvas.height !== newHeight) {
-          canvas.width = newWidth;
-          canvas.height = newHeight;
-          canvas.style.width = `${Math.floor(viewport.width)}px`;
-          canvas.style.height = `${Math.floor(viewport.height)}px`;
-        }
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
 
         context.clearRect(0, 0, canvas.width, canvas.height);
-        context.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-        if (!isCancelled) {
-          await pdfPage.render({ canvasContext: context, viewport } as any).promise;
-        }
+        await pdfPage.render({ canvasContext: context, viewport }).promise;
+        setRendering(false);
       } catch (error) {
-        if (!isCancelled) {
-          console.error("PDF rendering error:", error);
-        }
-      } finally {
-        if (!isCancelled) {
-          setRendering(false);
-        }
+        console.error("PDF rendering error:", error);
+        setRendering(false);
       }
-    }
+    };
 
-    // Only delay on initial load, not on page changes
-    const isInitialLoad = pdfDocRef.current && totalPages === 0;
-    const delay = isInitialLoad ? 100 : 0;
+    renderPage();
+  }, [page, totalPages]);
 
-    const timeoutId = setTimeout(renderPage, delay);
-
+  // Handle resize
+  useEffect(() => {
     const onResize = () => {
-      if (!isCancelled) {
-        renderPage();
+      // Force re-render on resize by updating a dummy state
+      if (pdfDocRef.current && totalPages > 0) {
+        setPage(current => current); // Trigger re-render
       }
     };
 
     window.addEventListener("resize", onResize);
-    return () => {
-      isCancelled = true;
-      clearTimeout(timeoutId);
-      window.removeEventListener("resize", onResize);
-    };
-  }, [page, totalPages, pdfDocRef.current]);
+    return () => window.removeEventListener("resize", onResize);
+  }, [totalPages]);
 
-  async function saveProgress(lastPage: number) {
+  const saveProgress = useCallback(async (lastPage: number) => {
     if (!readingId) return;
     try {
       const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -153,28 +152,41 @@ export default function PDFViewer({ courseId, startPage, endPage, readingId, onC
     } catch (e) {
       console.error("Failed to save progress:", e);
     }
-  }
+  }, [readingId]);
+
+  const handlePageChange = useCallback((newPage: number) => {
+    setPage(newPage);
+    saveProgress(newPage);
+  }, [saveProgress]);
 
   return (
     <div className="flex gap-6 w-full">
       {/* PDF Viewer */}
-      <Card className="flex-1 shadow-sm border border-gray-100">
+      <Card className="flex-1 shadow-sm border border-gray-100 dark:border-gray-700">
         <CardContent className="p-0">
           {/* PDF Display Area */}
-          <div ref={containerRef} className="h-[80vh] overflow-auto bg-white flex items-center justify-center p-4">
+          <div
+            ref={containerRef}
+            className="h-[80vh] overflow-auto bg-white dark:bg-gray-900 flex items-center justify-center p-4"
+            style={{scrollBehavior: 'auto', scrollbarGutter: 'stable'}}
+            onScroll={(e) => {
+              // Prevent propagation of scroll events from PDF container
+              e.stopPropagation();
+            }}
+          >
           {error ? (
             <div className="text-center p-8">
               <p className="text-red-600 mb-4">{error}</p>
               <Button onClick={onClose}>Close</Button>
             </div>
           ) : loadingPdf ? (
-            <div className="flex items-center justify-center text-gray-500">
+            <div className="flex items-center justify-center text-gray-500 dark:text-gray-400">
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
               Loading PDF...
             </div>
           ) : (
             <div className="p-4">
-              <canvas ref={canvasRef} className="shadow-sm border border-gray-100 rounded max-w-full" />
+              <canvas ref={canvasRef} className="shadow-sm border border-gray-100 dark:border-gray-700 rounded max-w-full" />
               {rendering && (
                 <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-50">
                   <Loader2 className="w-5 h-5 animate-spin text-gray-500" />
@@ -186,13 +198,14 @@ export default function PDFViewer({ courseId, startPage, endPage, readingId, onC
 
         {/* Navigation and Chat Toggle Controls */}
         {!error && (
-          <div className="flex items-center justify-between p-4 border-t border-gray-100">
+          <div className="flex items-center justify-between p-4 border-t border-gray-100 dark:border-gray-700">
             {/* Chat Toggle */}
             <Button
               variant="outline"
               size="sm"
               onClick={(e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 setShowChat(!showChat);
               }}
               className="cursor-pointer flex items-center gap-2"
@@ -218,9 +231,7 @@ export default function PDFViewer({ courseId, startPage, endPage, readingId, onC
               disabled={page === 1}
               onClick={(e) => {
                 e.preventDefault();
-                const next = Math.max(1, page - 1);
-                setPage(next);
-                saveProgress(next);
+                handlePageChange(Math.max(1, page - 1));
               }}
               className="cursor-pointer"
             >
@@ -229,31 +240,35 @@ export default function PDFViewer({ courseId, startPage, endPage, readingId, onC
             </Button>
 
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Page</span>
+              <span className="text-sm text-gray-600 dark:text-gray-300">Page</span>
               <Input
                 type="number"
                 value={page}
                 onChange={(e) => {
                   e.preventDefault();
+                  e.stopPropagation();
                   const v = parseInt(e.target.value || '1');
                   const clamped = Math.min(Math.max(v, 1), totalPages || 1);
                   setPage(clamped);
                 }}
                 onBlur={(e) => {
                   e.preventDefault();
+                  e.stopPropagation();
                   saveProgress(page);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
+                    e.stopPropagation();
                     saveProgress(page);
+                    (e.target as HTMLInputElement).blur();
                   }
                 }}
                 className="w-20 text-center"
                 min={1}
                 max={totalPages || 1}
               />
-              <span className="text-sm text-gray-600">of {totalPages || '...'}</span>
+              <span className="text-sm text-gray-600 dark:text-gray-300">of {totalPages || '...'}</span>
             </div>
 
             <Button
@@ -262,9 +277,7 @@ export default function PDFViewer({ courseId, startPage, endPage, readingId, onC
               disabled={page === totalPages}
               onClick={(e) => {
                 e.preventDefault();
-                const next = Math.min(totalPages || 1, page + 1);
-                setPage(next);
-                saveProgress(next);
+                handlePageChange(Math.min(totalPages || 1, page + 1));
               }}
               className="cursor-pointer"
             >
@@ -286,4 +299,6 @@ export default function PDFViewer({ courseId, startPage, endPage, readingId, onC
       />
     </div>
   );
-}
+});
+
+export default PDFViewer;

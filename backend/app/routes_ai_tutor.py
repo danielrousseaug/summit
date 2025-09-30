@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import List, Dict, Any, Optional
 import logging
+import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
@@ -34,10 +35,75 @@ class AITutorResponse(BaseModel):
     response: str
 
 
+def _extract_page_content_from_pdf(course_id: int, page_number: int, session: Session) -> str:
+    """Extract content from a specific PDF page using PyMuPDF."""
+
+    # Get course to find PDF path
+    course = session.get(Course, course_id)
+    if not course:
+        return "Course content not available."
+
+    # Try to extract from PDF if available
+    try:
+        import pymupdf  # PyMuPDF
+
+        # Construct the PDF path
+        pdf_path = f"storage/course_{course_id}.pdf"
+
+        if not os.path.exists(pdf_path):
+            # Fallback to text-based extraction
+            return _extract_page_content(course.raw_text or "", page_number)
+
+        # Open the PDF
+        doc = pymupdf.open(pdf_path)
+
+        # Ensure page number is valid
+        if page_number < 1 or page_number > doc.page_count:
+            page_number = min(max(1, page_number), doc.page_count)
+
+        # Extract text from the current page and surrounding pages for context
+        content_parts = []
+
+        # Get previous page for context (if exists)
+        if page_number > 1:
+            prev_page = doc[page_number - 2]  # 0-indexed
+            prev_text = prev_page.get_text()
+            if len(prev_text) > 500:  # Limit previous page content
+                prev_text = "..." + prev_text[-500:]
+            content_parts.append(f"[Context from page {page_number - 1}]\n{prev_text}\n")
+
+        # Get current page
+        current_page = doc[page_number - 1]  # 0-indexed
+        current_text = current_page.get_text()
+        content_parts.append(f"[Current page {page_number}]\n{current_text}\n")
+
+        # Get next page for context (if exists)
+        if page_number < doc.page_count:
+            next_page = doc[page_number]  # 0-indexed
+            next_text = next_page.get_text()
+            if len(next_text) > 500:  # Limit next page content
+                next_text = next_text[:500] + "..."
+            content_parts.append(f"[Context from page {page_number + 1}]\n{next_text}")
+
+        doc.close()
+
+        page_content = "\n".join(content_parts)
+
+        # Limit total content length for API efficiency
+        if len(page_content) > 6000:
+            page_content = page_content[:6000] + "..."
+
+        return page_content
+
+    except Exception as e:
+        logger.warning(f"Failed to extract PDF content: {e}")
+        # Fallback to text-based extraction
+        return _extract_page_content(course.raw_text or "", page_number)
+
+
 def _extract_page_content(course_text: str, page_number: int, context_pages: int = 1) -> str:
     """Extract content around the specified page from course text.
-    This is a simplified implementation - in production you might want
-    to use proper PDF page extraction."""
+    This is a fallback when PDF extraction is not available."""
 
     # Split text into approximate pages (this is a rough estimation)
     lines = course_text.split('\n')
@@ -131,8 +197,8 @@ async def ai_tutor_chat(
     if course.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    # Extract relevant page content
-    page_content = _extract_page_content(course.raw_text, request.page_number)
+    # Extract relevant page content from PDF if available
+    page_content = _extract_page_content_from_pdf(course_id, request.page_number, session)
 
     logger.info(
         "AI tutor request: user_id=%s, course_id=%s, page=%s, message_length=%s",

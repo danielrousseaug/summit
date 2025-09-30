@@ -5,19 +5,21 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import {
-  Menu,
   X,
   Plus,
   BookOpen,
   User,
   LogOut,
-  ChevronLeft,
-  ChevronRight,
   Settings,
   Search,
   Users,
   Moon,
-  Sun
+  Sun,
+  PanelLeft,
+  Sidebar,
+  MoreHorizontal,
+  Edit3,
+  Trash2
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/hooks/useTheme";
@@ -46,8 +48,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [isHovering, setIsHovering] = useState(false);
+  const [showExpandedButton, setShowExpandedButton] = useState(!isCollapsed);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [hoveredCourseId, setHoveredCourseId] = useState<number | null>(null);
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [renameTitle, setRenameTitle] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState<number | null>(null);
 
   useEffect(() => {
     if (!auth.token) {
@@ -118,91 +127,108 @@ export default function AppLayout({ children }: AppLayoutProps) {
     logout();
   };
 
+  const handleToggleCollapse = () => {
+    if (isCollapsed) {
+      // Expanding: hide expanded button first, then show after delay
+      setShowExpandedButton(false);
+      setTimeout(() => {
+        setShowExpandedButton(true);
+      }, 100);
+    } else {
+      // Collapsing: show expanded button immediately
+      setShowExpandedButton(true);
+    }
+    setIsCollapsed(!isCollapsed);
+    setIsHovering(false);
+  };
+
   const sidebarWidth = isCollapsed ? "w-16" : "w-64";
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
       {/* Sidebar */}
-      <div className={`${sidebarWidth} bg-[#f9f9f9] dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300`}>
+      <div className={`${sidebarWidth} ${
+        isCollapsed
+          ? 'bg-white dark:bg-gray-900'
+          : 'bg-[#f9f9f9] dark:bg-gray-900'
+      } border-r border-gray-200 dark:border-gray-800 flex flex-col transition-all duration-300`}>
         {/* Header */}
-        <div className="flex items-center justify-between p-4">
-          {!isCollapsed && (
-            <Link href="/" className="flex items-center">
+        <div className="px-4 py-4">
+          <div className="flex items-center px-3 py-2 h-10 relative">
+            <Link href="/" className="flex items-center h-full">
               <Image
                 src={isDark ? "/images/logos/logo-icon-white.svg" : "/images/logos/logo-icon-black.svg"}
                 alt="Summit"
-                width={24}
-                height={24}
-                className="mr-2"
+                width={26}
+                height={26}
+                className="flex-shrink-0"
+                style={{ marginLeft: '-6px' }}
               />
-              <span className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white">Summit</span>
+              <div className={`ml-3 flex items-center h-full transition-all duration-300 overflow-hidden ${
+                isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+              }`}>
+                <span className="text-lg font-semibold text-gray-900 dark:text-white whitespace-nowrap">
+                  Summit
+                </span>
+              </div>
             </Link>
-          )}
-          <div
-            onMouseEnter={() => setIsHovering(true)}
-            onMouseLeave={() => setIsHovering(false)}
-            className="relative"
-          >
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-1 hover:bg-gray-200 cursor-pointer"
-            >
-              {isCollapsed ? (
-                isHovering ? (
-                  <ChevronRight className="w-4 h-4" />
-                ) : (
-                  <Image
-                    src={isDark ? "/images/logos/logo-icon-white.svg" : "/images/logos/logo-icon-black.svg"}
-                    alt="Summit"
-                    width={22}
-                    height={22}
-                  />
-                )
-              ) : (
-                <ChevronLeft className="w-4 h-4" />
-              )}
-            </Button>
+            {!isCollapsed && showExpandedButton && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleToggleCollapse}
+                className="absolute p-1 hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center transition-all duration-300"
+                style={{ right: '-4px' }}
+              >
+                <PanelLeft className="w-4 h-4" />
+              </Button>
+            )}
+            {isCollapsed && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleToggleCollapse}
+                onMouseEnter={() => setIsHovering(true)}
+                onMouseLeave={() => setIsHovering(false)}
+                className="absolute p-1 hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center transition-all duration-300"
+                style={{ left: '3px', top: '50%', transform: 'translateY(-50%)' }}
+              >
+                <PanelLeft className={`w-4 h-4 transition-opacity duration-300 ${
+                  isHovering ? 'opacity-100' : 'opacity-0'
+                }`} />
+              </Button>
+            )}
           </div>
-        </div>
-
-        {/* New Course Button */}
-        <div className="p-4">
-          <Button
-            onClick={handleCreateCourse}
-            variant="outline"
-            className="w-full h-10 bg-white dark:bg-gray-800 dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white dark:text-white flex items-center justify-center gap-2 transition-all duration-300 cursor-pointer"
-          >
-<Plus
-  className={`w-4 h-4 flex-shrink-0 ${
-    isCollapsed ? "mr-[-0.5rem]" : ""
-  }`}
-/>
-            <span className={`whitespace-nowrap transition-all duration-300 overflow-hidden ${
-              isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
-            }`}>
-              New Course
-            </span>
-          </Button>
         </div>
 
 {/* Navigation Buttons */}
 <div className="px-4 pb-4 space-y-0">
+  {/* New Course */}
+  <button
+    onClick={handleCreateCourse}
+    className="w-full flex items-center px-3 py-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 text-left cursor-pointer"
+  >
+    <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+      <Plus className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+    </div>
+    <span
+      className={`ml-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap transition-all duration-300 overflow-hidden ${
+        isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+      }`}
+    >
+      New Course
+    </span>
+  </button>
   {/* Search Courses */}
   <button
     onClick={() => setSearchModalOpen(true)}
-    className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-700 dark:hover:bg-gray-700 text-left cursor-pointer ${
-      isCollapsed ? "justify-center" : "justify-start gap-3"
-    }`}
+    className="w-full flex items-center px-3 py-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 text-left cursor-pointer"
   >
-    <Search
-      className={`w-4 h-4 text-gray-600 dark:text-gray-300 flex-shrink-0 ${
-        isCollapsed ? "ml-[0.12rem]" : ""
-      }`}
-    />
+    <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+      <Search className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+    </div>
     <span
-      className={`text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap transition-all duration-300 overflow-hidden ${
+      className={`ml-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap transition-all duration-300 overflow-hidden ${
         isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
       }`}
     >
@@ -213,17 +239,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
   {/* Community Courses */}
   <Link
     href="/community"
-    className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-700 cursor-pointer ${
-      isCollapsed ? "justify-center" : "justify-start gap-3"
-    }`}
+    className="w-full flex items-center px-3 py-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
   >
-    <Users
-      className={`w-4 h-4 text-gray-600 dark:text-gray-300 flex-shrink-0 ${
-        isCollapsed ? "ml-[0.12rem]" : ""
-      }`}
-    />
+    <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+      <Users className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+    </div>
     <span
-      className={`text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap transition-all duration-300 overflow-hidden ${
+      className={`ml-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap transition-all duration-300 overflow-hidden ${
         isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
       }`}
     >
@@ -251,18 +273,78 @@ export default function AppLayout({ children }: AppLayoutProps) {
             ) : (
               <div className="space-y-0">
                 {courses.map((course) => (
-                  <Link
+                  <div
                     key={course.id}
-                    href={`/courses/${course.id}`}
-                    prefetch={true}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-700 cursor-pointer ${
-                      pathname === `/courses/${course.id}` ? "bg-gray-100 dark:bg-gray-700" : ""
-                    }`}
+                    className="relative"
+                    onMouseEnter={() => setHoveredCourseId(course.id)}
+                    onMouseLeave={() => {
+                      if (dropdownOpen !== course.id) {
+                        setHoveredCourseId(null);
+                      }
+                    }}
                   >
-                    <span className="text-sm text-gray-700 dark:text-gray-300 truncate whitespace-nowrap">
-                      {course.title}
-                    </span>
-                  </Link>
+                    <Link
+                      href={`/courses/${course.id}`}
+                      prefetch={true}
+                      className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer ${
+                        pathname === `/courses/${course.id}` ? "bg-gray-100 dark:bg-gray-800" : ""
+                      }`}
+                    >
+                      <span className="text-sm text-gray-700 dark:text-gray-300 truncate whitespace-nowrap">
+                        {course.title}
+                      </span>
+                    </Link>
+                    {(hoveredCourseId === course.id || dropdownOpen === course.id) && (
+                      <DropdownMenu
+                        onOpenChange={(open) => {
+                          if (open) {
+                            setDropdownOpen(course.id);
+                          } else {
+                            setDropdownOpen(null);
+                            setHoveredCourseId(null);
+                          }
+                        }}
+                      >
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 h-6 w-6 hover:bg-gray-200 dark:hover:bg-gray-700 opacity-100 transition-opacity cursor-pointer"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                          >
+                            <MoreHorizontal className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedCourse(course);
+                              setRenameTitle(course.title);
+                              setRenameModalOpen(true);
+                            }}
+                          >
+                            <Edit3 className="w-4 h-4 mr-2" />
+                            Rename
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedCourse(course);
+                              setDeleteModalOpen(true);
+                            }}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -270,37 +352,27 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </div>
 
         {/* User Profile */}
-        <div className="border-t border-gray-200 dark:border-gray-700 p-4 mt-auto">
+        <div className="border-t border-gray-200 dark:border-gray-800 p-4 mt-auto">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className={`w-full p-2 h-12 hover:bg-gray-200/50 dark:hover:bg-gray-700/50 rounded-lg transition-all duration-300 ${
-                  isCollapsed ? "justify-center" : "justify-start"
-                }`}
+                className="w-full p-2 h-12 hover:bg-gray-200/50 dark:hover:bg-gray-800/50 rounded-lg transition-all duration-300 flex items-center relative cursor-pointer"
               >
-                <div className="flex items-center gap-3 w-full">
-
-<Avatar
-  className={`w-8 h-8 flex-shrink-0 ${
-    isCollapsed ? "ml-[-0.5rem]" : ""
-  }`}
->
-  <AvatarFallback className="bg-gray-900 text-white text-sm font-medium">
-    {getUserInitial()}
-  </AvatarFallback>
-</Avatar>
-
-                  <div className={`flex-1 min-w-0 text-left transition-all duration-300 overflow-hidden ${
-                    isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
-                  }`}>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {auth.email?.split("@")[0]}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {auth.email}
-                    </p>
-                  </div>
+                <Avatar className="w-8 h-8 absolute" style={{ left: '0px' }}>
+                  <AvatarFallback className="bg-gray-900 text-white text-sm font-medium">
+                    {getUserInitial()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className={`ml-12 flex-1 min-w-0 text-left transition-all duration-300 overflow-hidden ${
+                  isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+                }`}>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {auth.email?.split("@")[0]}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {auth.email}
+                  </p>
                 </div>
               </Button>
             </DropdownMenuTrigger>
@@ -335,17 +407,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Search Modal */}
       {searchModalOpen && (
         <div
-          className="fixed inset-0 bg-black/20 dark:bg-black/50 backdrop-blur-sm flex items-start justify-center pt-16 z-50"
+          className="fixed inset-0 bg-black/20 dark:bg-black/70 backdrop-blur-sm flex items-start justify-center pt-16 z-50"
           onClick={() => setSearchModalOpen(false)}
         >
           <div
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg mx-4 ring-1 ring-gray-200"
+            className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-lg mx-4 ring-1 ring-gray-200 dark:ring-gray-800"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                  <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
                     <Search className="w-4 h-4 text-gray-600 dark:text-gray-300" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search Courses</h3>
@@ -354,7 +426,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => setSearchModalOpen(false)}
-                  className="hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-700 rounded-lg"
+                  className="hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
                 >
                   <X className="w-4 h-4" />
                 </Button>
@@ -367,7 +439,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     placeholder="Type to search your courses..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent text-sm"
+                    className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent text-sm"
                     autoFocus
                   />
                 </div>
@@ -383,7 +455,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                         <Link
                           key={course.id}
                           href={`/courses/${course.id}`}
-                          className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-50 dark:border-gray-700 last:border-b-0"
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-50 dark:border-gray-800 last:border-b-0"
                           onClick={() => {
                             setSearchModalOpen(false);
                             setSearchQuery("");
@@ -399,7 +471,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       course.title.toLowerCase().includes(searchQuery.toLowerCase())
                     ).length === 0 && (
                       <div className="px-4 py-8 text-center">
-                        <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center mx-auto mb-3">
                           <Search className="w-5 h-5 text-gray-400" />
                         </div>
                         <p className="text-sm text-gray-500 dark:text-gray-400">No courses found for "{searchQuery}"</p>
@@ -410,12 +482,172 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
                 {courses.length === 0 && (
                   <div className="px-4 py-8 text-center border border-gray-100 rounded-lg">
-                    <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center mx-auto mb-3">
                       <Search className="w-5 h-5 text-gray-400" />
                     </div>
                     <p className="text-sm text-gray-500 dark:text-gray-400">No courses available</p>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Course Modal */}
+      {renameModalOpen && selectedCourse && (
+        <div
+          className="fixed inset-0 bg-black/20 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setRenameModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md mx-4 ring-1 ring-gray-200 dark:ring-gray-800"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+                    <Edit3 className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Rename Course</h3>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setRenameModalOpen(false)}
+                  className="hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Course Title
+                  </label>
+                  <input
+                    type="text"
+                    value={renameTitle}
+                    onChange={(e) => setRenameTitle(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent text-sm"
+                    placeholder="Enter course title"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    onClick={() => setRenameModalOpen(false)}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (!selectedCourse || !renameTitle.trim()) return;
+                      try {
+                        await api.renameCourse(selectedCourse.id, renameTitle.trim());
+                        // Update local state
+                        setCourses(prev => prev.map(c =>
+                          c.id === selectedCourse.id ? { ...c, title: renameTitle.trim() } : c
+                        ));
+                        // Update cache
+                        const updatedCourses = courses.map(c =>
+                          c.id === selectedCourse.id ? { ...c, title: renameTitle.trim() } : c
+                        );
+                        sessionStorage.setItem('summit_courses', JSON.stringify(updatedCourses));
+                        setRenameModalOpen(false);
+                      } catch (error) {
+                        console.error('Failed to rename course:', error);
+                      }
+                    }}
+                    className="flex-1 bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900"
+                    disabled={!renameTitle.trim()}
+                  >
+                    Rename
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Course Modal */}
+      {deleteModalOpen && selectedCourse && (
+        <div
+          className="fixed inset-0 bg-black/20 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setDeleteModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md mx-4 ring-1 ring-gray-200 dark:ring-gray-800"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
+                    <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Delete Course</h3>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDeleteModalOpen(false)}
+                  className="hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Are you sure you want to delete this course? This action cannot be undone.
+                  </p>
+                  <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {selectedCourse.title}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    onClick={() => setDeleteModalOpen(false)}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (!selectedCourse) return;
+                      try {
+                        await api.deleteCourse(selectedCourse.id);
+                        // Update local state
+                        setCourses(prev => prev.filter(c => c.id !== selectedCourse.id));
+                        // Update cache
+                        const updatedCourses = courses.filter(c => c.id !== selectedCourse.id);
+                        sessionStorage.setItem('summit_courses', JSON.stringify(updatedCourses));
+                        setDeleteModalOpen(false);
+                        // Navigate away if we're currently viewing the deleted course
+                        if (pathname === `/courses/${selectedCourse.id}`) {
+                          router.push('/');
+                        }
+                      } catch (error) {
+                        console.error('Failed to delete course:', error);
+                      }
+                    }}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    Delete Course
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

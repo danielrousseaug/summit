@@ -25,16 +25,30 @@ from .routes_ai_tutor import router as ai_tutor_router
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     # Load environment variables from a .env file if present
-    # Look for .env file in parent directory (project root)
-    load_dotenv("../.env")
+    # Look for .env file in project root (one level up from backend dir)
+    env_path = "../.env"
+    print(f"DEBUG: Loading .env from: {os.path.abspath(env_path)}")
+    print(f"DEBUG: .env exists: {os.path.exists(os.path.abspath(env_path))}")
+    load_dotenv(env_path)
+    print(f"DEBUG: AI_DEBUG_LOG = {os.getenv('AI_DEBUG_LOG')}")
     # Initialize logging for observability
     log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     logging.basicConfig(level=log_level)
     logging.getLogger("summit").setLevel(log_level)
     # Optional AI debug file logging (prompts/responses). WARNING: may include sensitive content.
     if os.getenv("AI_DEBUG_LOG") == "1":
-        log_dir = os.getenv("AI_LOG_DIR", "/app/backend/logs")
+        log_dir = os.getenv("AI_LOG_DIR", "backend/logs")
         log_file = os.getenv("AI_LOG_FILE", os.path.join(log_dir, "ai_debug.log"))
+
+        # Convert to absolute path if not already absolute
+        if not os.path.isabs(log_dir):
+            log_dir = os.path.join(os.getcwd(), log_dir)
+        if not os.path.isabs(log_file):
+            log_file = os.path.join(os.getcwd(), log_file)
+
+        print(f"DEBUG: Setting up AI debug logging at: {log_file}")
+        print(f"DEBUG: Current working directory: {os.getcwd()}")
+
         try:
             os.makedirs(log_dir, exist_ok=True)
             fh = logging.FileHandler(log_file)
@@ -47,8 +61,12 @@ async def lifespan(_: FastAPI):
             # Also ensure child loggers inherit DEBUG level for detailed traces
             logging.getLogger("summit.ai").setLevel(logging.DEBUG)
             logging.getLogger("summit.courses").setLevel(logging.DEBUG)
-        except Exception:
+            print(f"DEBUG: AI debug logging successfully configured")
+            # Test log message
+            logging.getLogger("summit.ai").debug("AI debug logging initialized successfully")
+        except Exception as e:
             logging.getLogger("summit").warning("Failed to initialize AI debug file logging", exc_info=True)
+            print(f"ERROR: Failed to initialize AI debug logging: {e}")
     # Initialize database tables on startup
     create_db_and_tables()
     yield

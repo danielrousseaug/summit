@@ -61,6 +61,19 @@ class SyllabusItem(SQLModel, table=True):
     order_index: int
     title: str
     summary: str
+    start_page: Optional[int] = None
+    end_page: Optional[int] = None
+    content: Optional[str] = None  # Full PDF content for this section
+
+    # Relationship fields are omitted in MVP to simplify mapping
+
+
+class PDFPage(SQLModel, table=True):
+    """Stores extracted text content for each page of a PDF"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id")
+    page_number: int
+    content: str
 
     # Relationship fields are omitted in MVP to simplify mapping
 
@@ -138,6 +151,7 @@ class NoteUpdate(SQLModel):
 class Quiz(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     course_id: int = Field(foreign_key="course.id")
+    syllabus_item_id: Optional[int] = Field(default=None, foreign_key="syllabusitem.id")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -156,6 +170,8 @@ class QuizQuestion(SQLModel, table=True):
 class QuizRead(SQLModel):
     id: int
     course_id: int
+    syllabus_item_id: Optional[int] = None
+    syllabus_item_title: Optional[str] = None
     created_at: datetime
     num_questions: int
 
@@ -170,6 +186,8 @@ class QuizQuestionRead(SQLModel):
 class QuizDetailRead(SQLModel):
     id: int
     course_id: int
+    syllabus_item_id: Optional[int] = None
+    syllabus_item_title: Optional[str] = None
     created_at: datetime
     questions: List[QuizQuestionRead]
 

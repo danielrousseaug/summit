@@ -30,6 +30,7 @@ from .models import (
     AssignmentSubmission,
     ScheduleItem,
     SyllabusCompletion,
+    PDFPage,
 )
 
 router = APIRouter(prefix="/courses", tags=["courses"])
@@ -78,22 +79,22 @@ def list_courses(current_user: User = Depends(get_current_user), session: Sessio
     return courses
 
 
-@router.post("/upload", response_model=CourseReadWithSyllabus, status_code=status.HTTP_201_CREATED)
-async def upload_course(
+@router.post("/upload", status_code=status.HTTP_201_CREATED)
+def upload_course(
     file: UploadFile = File(...),
     title: str = Form(...),
     topics: str | None = Form(None),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> CourseReadWithSyllabus:
-    data = file.file.read()
-    raw_text = data.decode("utf-8", errors="ignore") if file.content_type != "application/pdf" else ""
+    # Extract text from upload
+    raw_text = _extract_text_from_upload(file)
     if not raw_text.strip():
         # allow pdf-only uploads
         if not (file.content_type == "application/pdf" or (file.filename and file.filename.lower().endswith(".pdf"))):
             raise HTTPException(status_code=400, detail="Empty or unreadable file")
 
-    # Persist PDF to disk if provided
+    # Handle PDF storage if applicable
     pdf_path = None
     num_pages = None
     if file.content_type == "application/pdf" or (file.filename and file.filename.lower().endswith(".pdf")):
@@ -101,6 +102,9 @@ async def upload_course(
         os.makedirs(storage_dir, exist_ok=True)
         safe_name = f"u{current_user.id}_{title.replace(' ', '_')}_{file.filename}"
         pdf_path = os.path.join(storage_dir, safe_name)
+        # Reset file position
+        file.file.seek(0)
+        data = file.file.read()
         with open(pdf_path, "wb") as f:
             f.write(data)
         try:
@@ -110,10 +114,29 @@ async def upload_course(
         except Exception:
             num_pages = None
 
+    # Create course
     course = Course(user_id=current_user.id, title=title, source_filename=file.filename, pdf_path=pdf_path, num_pages=num_pages or None, topics=topics, raw_text=raw_text)
     session.add(course)
     session.commit()
     session.refresh(course)
+
+    # Extract and store PDF page content for quick access
+    if pdf_path and num_pages:
+        try:
+            import fitz  # type: ignore
+            with fitz.open(pdf_path) as doc:
+                for page_num in range(doc.page_count):
+                    page_content = doc[page_num].get_text()
+                    pdf_page = PDFPage(
+                        course_id=course.id,
+                        page_number=page_num + 1,  # 1-indexed for user convenience
+                        content=page_content
+                    )
+                    session.add(pdf_page)
+                session.commit()
+                logger.info("Extracted and stored %d PDF pages for course %d", doc.page_count, course.id)
+        except Exception as e:
+            logger.warning("Failed to extract PDF pages: %s", e, exc_info=True)
 
     # Build syllabus (AI if enabled). For PDFs, prefer deriving titles from page samples.
     use_ai = should_use_ai()
@@ -258,6 +281,29 @@ async def get_course(course_id: int, current_user: User = Depends(get_current_us
     items = session.exec(select(SyllabusItem).where(SyllabusItem.course_id == course.id).order_by(SyllabusItem.order_index)).all()
     items_read = [SyllabusItemRead(id=it.id, order_index=it.order_index, title=it.title, summary=it.summary) for it in items]
     return CourseReadWithSyllabus(id=course.id, title=course.title, source_filename=course.source_filename, created_at=course.created_at, syllabus=items_read)
+
+
+@router.put("/{course_id}", response_model=CourseRead)
+async def update_course(course_id: int, payload: dict, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> CourseRead:
+    course = session.get(Course, course_id)
+    if not course or course.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Only support updating the title for now
+    if "title" in payload:
+        course.title = payload["title"]
+        session.add(course)
+        session.commit()
+        session.refresh(course)
+
+    return CourseRead(
+        id=course.id,
+        title=course.title,
+        source_filename=course.source_filename,
+        num_pages=course.num_pages,
+        topics=course.topics,
+        created_at=course.created_at
+    )
 
 
 @router.delete("/{course_id}", status_code=status.HTTP_204_NO_CONTENT)

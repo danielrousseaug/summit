@@ -148,31 +148,29 @@ def generate_syllabus(text: str, max_items: int = 8, use_ai: bool = False, topic
     return generate_syllabus(text, max_items=max_items, use_ai=False)
 
 
-def generate_quiz_from_titles(titles: List[str], num_questions: int = 5, use_ai: bool = False) -> List[Dict[str, Any]]:
-    if not use_ai or not _has_key():
-        logger.info("generate_quiz_from_titles: using fallback (use_ai=%s, has_key=%s)", use_ai, _has_key())
-        # fallback: MCQs using titles presence
-        items: list[Dict[str, Any]] = []
-        from random import choice, shuffle
+def generate_quiz_from_content(
+    section_title: str,
+    section_content: str,
+    num_questions: int = 10,
+    use_ai: bool = False
+) -> List[Dict[str, Any]]:
+    """Generate quiz questions from full section content rather than just titles."""
+    import random
 
-        base = titles[:]
-        if not base:
-            base = ["Introduction"]
-        for idx in range(min(num_questions, max(1, len(base)))):
-            correct = choice(base)
-            distractors = [t for t in base if t != correct]
-            while len(distractors) < 3:
-                distractors.append(choice(base))
-            options = distractors[:3] + [correct]
-            shuffle(options)
-            answer_index = options.index(correct)
-            items.append(
-                {
-                    "prompt": "Which of the following is a syllabus item of this course?",
-                    "options": options[:4],
-                    "answer_index": answer_index,
-                }
-            )
+    if not use_ai or not _has_key():
+        logger.info("generate_quiz_from_content: using fallback (use_ai=%s, has_key=%s)", use_ai, _has_key())
+        # Simple fallback - create basic comprehension questions
+        items: list[Dict[str, Any]] = []
+        for i in range(min(num_questions, 3)):
+            options = [
+                f"Answer option {j+1} for {section_title}" for j in range(4)
+            ]
+            random.shuffle(options)
+            items.append({
+                "prompt": f"Question {i+1} about {section_title}",
+                "options": options,
+                "answer_index": 0,  # First option is always correct in fallback
+            })
         return items
 
     try:
@@ -180,45 +178,105 @@ def generate_quiz_from_titles(titles: List[str], num_questions: int = 5, use_ai:
 
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-        logger.info("generate_quiz_from_titles: using AI model=%s, num_questions=%d", model, num_questions)
-        prompt = (
-            "Create multiple-choice questions based on these syllabus titles. "
-            "Return a JSON array where each item is {prompt, options: [4 strings], answer_index: 0-3}. "
-            f"Create {num_questions} questions."
-        )
-        combined = prompt + "\n\nTITLES:\n" + "\n".join(f"- {t}" for t in titles[:100])
+        logger.info("generate_quiz_from_content: using AI model=%s, num_questions=%d", model, num_questions)
+
+        # Truncate content if too long (keep under ~8000 chars for context)
+        content_excerpt = section_content[:8000] if len(section_content) > 8000 else section_content
+
+        prompt = f"""Create {num_questions} multiple-choice questions based on the following content from "{section_title}".
+
+Each question should:
+- Test understanding of key concepts from the text
+- Be clear and unambiguous
+- Have exactly 4 options
+
+Return a JSON array where each item has:
+- "prompt": the question text
+- "correct": the correct answer
+- "wrong": array of 3 incorrect answers
+
+Example format:
+[
+  {{
+    "prompt": "What is the main topic discussed?",
+    "correct": "The correct answer",
+    "wrong": ["Wrong answer 1", "Wrong answer 2", "Wrong answer 3"]
+  }}
+]
+
+CONTENT:
+{content_excerpt}
+
+Generate {num_questions} questions:"""
+
         if os.getenv("AI_DEBUG_LOG") == "1":
-            logger.debug("generate_quiz_from_titles: PROMPT (first 2k chars)=%s", combined[:2000])
+            logger.debug("="*80)
+            logger.debug("GENERATE_QUIZ_FROM_CONTENT - START")
+            logger.debug("Section Title: %s", section_title)
+            logger.debug("Content Length: %d characters", len(content_excerpt))
+            logger.debug("Number of Questions Requested: %d", num_questions)
+            logger.debug("-"*40)
+            logger.debug("PROMPT:")
+            logger.debug(prompt)
+            logger.debug("-"*40)
+
         resp = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": "Return only a JSON array. Do not include code fences or extra text."},
-                {"role": "user", "content": combined},
+                {"role": "system", "content": "You are a quiz generator. Return only valid JSON array with no additional text or code fences."},
+                {"role": "user", "content": prompt},
             ],
-            temperature=0.2,
+            temperature=0.3,
         )
+
         content = resp.choices[0].message.content or "[]"
         if os.getenv("AI_DEBUG_LOG") == "1":
-            logger.debug("generate_quiz_from_titles: RAW RESPONSE (first 2k chars)=%s", (content or "")[:2000])
+            logger.debug("RESPONSE FROM MODEL (%s):", model)
+            logger.debug(content)
+            logger.debug("GENERATE_QUIZ_FROM_CONTENT - END")
+            logger.debug("="*80)
+
         data = _try_parse_json(content) or []
         out: list[Dict[str, Any]] = []
-        for obj in data:
-            options = list(obj.get("options", []))[:4]
-            if len(options) < 4:
+
+        for obj in data[:num_questions]:
+            prompt_text = str(obj.get("prompt", ""))[:300]
+            correct = str(obj.get("correct", ""))[:120]
+            wrong = obj.get("wrong", [])
+
+            if not prompt_text or not correct or len(wrong) < 3:
                 continue
-            answer_index = int(obj.get("answer_index", 0))
-            if not (0 <= answer_index < 4):
-                answer_index = 0
+
+            # Combine correct and wrong answers, then shuffle
+            options = [correct] + [str(w)[:120] for w in wrong[:3]]
+            random.shuffle(options)
+
+            # Find where the correct answer ended up
+            answer_index = options.index(correct)
+
             out.append({
-                "prompt": str(obj.get("prompt", "Question?") )[:300],
-                "options": [str(o)[:120] for o in options],
+                "prompt": prompt_text,
+                "options": options,
                 "answer_index": answer_index,
             })
-        if out:
-            return out[:num_questions]
-    except Exception:
-        logger.warning("generate_quiz_from_titles: AI path failed; falling back", exc_info=True)
-    return generate_quiz_from_titles(titles, num_questions=num_questions, use_ai=False)
+
+        if len(out) < num_questions:
+            logger.warning(f"Only generated {len(out)} questions out of {num_questions} requested")
+
+        return out[:num_questions]
+
+    except Exception as e:
+        logger.warning("generate_quiz_from_content: AI path failed; falling back", exc_info=True)
+
+    return generate_quiz_from_content(section_title, section_content[:500], num_questions=min(num_questions, 3), use_ai=False)
+
+
+def generate_quiz_from_titles(titles: List[str], num_questions: int = 5, use_ai: bool = False) -> List[Dict[str, Any]]:
+    """Legacy function for backward compatibility."""
+    # Convert titles to pseudo-content and use new function
+    content = "\n".join(f"Section: {t}" for t in titles)
+    title = "Course Overview"
+    return generate_quiz_from_content(title, content, num_questions, use_ai)
 
 
 def generate_assignments_from_titles(titles: List[str], max_q: int = 3, use_ai: bool = False) -> List[Dict[str, str]]:
@@ -288,7 +346,17 @@ def summarize_section(title: str, text: str, use_ai: bool = False) -> str:
         model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         logger.info("summarize_section: using AI model=%s for title=%r", model, title[:80])
         if os.getenv("AI_DEBUG_LOG") == "1":
-            logger.debug("summarize_section: PROMPT system=%r, user_len=%d", sys, len(user))
+            logger.debug("="*80)
+            logger.debug("SUMMARIZE_SECTION - START")
+            logger.debug("Model: %s", model)
+            logger.debug("Title: %s", title)
+            logger.debug("-"*40)
+            logger.debug("SYSTEM PROMPT:")
+            logger.debug(sys)
+            logger.debug("-"*40)
+            logger.debug("USER PROMPT:")
+            logger.debug(user)
+            logger.debug("-"*40)
         resp = client.chat.completions.create(
             model=model,
             messages=[{"role": "system", "content": sys}, {"role": "user", "content": user}],
@@ -296,7 +364,10 @@ def summarize_section(title: str, text: str, use_ai: bool = False) -> str:
         )
         content = (resp.choices[0].message.content or "").strip()
         if os.getenv("AI_DEBUG_LOG") == "1":
-            logger.debug("summarize_section: RAW RESPONSE (first 1k chars)=%s", content[:1000])
+            logger.debug("RESPONSE FROM MODEL (%s):", model)
+            logger.debug(content)
+            logger.debug("SUMMARIZE_SECTION - END")
+            logger.debug("="*80)
         return content[:200] if content else f"Summary for {title}."
     except Exception:
         logger.warning("summarize_section: AI path failed; falling back for title=%r", title[:80], exc_info=True)
@@ -325,7 +396,20 @@ def extract_toc_from_text(text: str, max_items: int = 20, use_ai: bool = False) 
         model = os.getenv("OPENAI_TOC_MODEL", os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
         logger.info("extract_toc_from_text: using AI model=%s, sample_chars=%d, max_items=%d", model, len(sample), max_items)
         if os.getenv("AI_DEBUG_LOG") == "1":
-            logger.debug("extract_toc_from_text: PROMPT system=%r user_len=%d", sys, len(user))
+            logger.debug("="*80)
+            logger.debug("EXTRACT_TOC_FROM_TEXT - START")
+            logger.debug("Model: %s", model)
+            logger.debug("Sample Length: %d characters", len(sample))
+            logger.debug("Max Items Requested: %d", max_items)
+            logger.debug("-"*40)
+            logger.debug("SYSTEM PROMPT:")
+            logger.debug(sys)
+            logger.debug("-"*40)
+            logger.debug("USER PROMPT (first 5000 chars):")
+            logger.debug(user[:5000])
+            if len(user) > 5000:
+                logger.debug("... [%d more characters]", len(user) - 5000)
+            logger.debug("-"*40)
         resp = client.chat.completions.create(
             model=model,
             messages=[{"role": "system", "content": sys}, {"role": "user", "content": user}],
@@ -333,7 +417,10 @@ def extract_toc_from_text(text: str, max_items: int = 20, use_ai: bool = False) 
         )
         content = resp.choices[0].message.content or "[]"
         if os.getenv("AI_DEBUG_LOG") == "1":
-            logger.debug("extract_toc_from_text: RAW RESPONSE (first 2k chars)=%s", (content or "")[:2000])
+            logger.debug("RESPONSE FROM MODEL (%s):", model)
+            logger.debug(content)
+            logger.debug("EXTRACT_TOC_FROM_TEXT - END")
+            logger.debug("="*80)
         data = _try_parse_json(content) or []
         out: List[Dict[str, Any]] = []
         for obj in data:

@@ -75,7 +75,7 @@ export function NoteItem({ note, onChanged }: { note: Note; onChanged: () => voi
         </div>
         <div className="flex gap-3">
           {!isEditing && (
-            <button className="text-sm text-blue-600 hover:underline" onClick={() => setIsEditing(true)}>
+            <button className="text-sm text-gray-600 dark:text-gray-400 hover:underline" onClick={() => setIsEditing(true)}>
               Edit
             </button>
           )}

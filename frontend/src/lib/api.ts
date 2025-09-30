@@ -54,4 +54,10 @@ export const api = {
     if (!resp.ok) throw new Error(`Upload failed ${resp.status}`);
     return (await resp.json()) as import("@/types/course").CourseWithSyllabus;
   },
+  renameCourse: (courseId: number, newTitle: string) =>
+    fetchJson<import("@/types/course").Course>(`/courses/${courseId}`, {
+      method: "PUT",
+      body: JSON.stringify({ title: newTitle }),
+    }),
+  deleteCourse: (courseId: number) => fetchJson<void>(`/courses/${courseId}`, { method: "DELETE" }),
 };

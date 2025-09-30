@@ -79,17 +79,20 @@ export default function TakeQuizPage() {
     try {
       const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const token = localStorage.getItem("token");
-      const url = `${base}/courses/quizzes/${quiz.id}/pdf?token=${encodeURIComponent(token || "")}`;
+      const url = `${base}/courses/quizzes/${quiz.id}/pdf`;
 
-      // Use fetch to handle authentication properly
+      console.log("PDF Download Debug:", { base, quizId: quiz.id, url, hasToken: !!token });
+
+      // Use fetch with proper headers (remove token from URL since we're using Authorization header)
       const response = await fetch(url, {
         headers: {
-          Authorization: `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
+        cache: "no-store"
       });
 
       if (!response.ok) {
-        throw new Error(`Download failed: ${response.status}`);
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
       }
 
       // Get the PDF blob and create a download link
@@ -132,15 +135,15 @@ export default function TakeQuizPage() {
   if (!auth.token) return <RequireAuth />;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="container mx-auto px-6 py-8 max-w-4xl">
         {/* Header Section */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/courses/${params?.id}/quizzes`} className="flex items-center gap-2">
+              <Link href={`/courses/${params?.id}?tab=quizzes`} className="flex items-center gap-2">
                 <ArrowLeft className="w-4 h-4" />
-                Back to Quizzes
+                Back to Course
               </Link>
             </Button>
             <div className="flex items-center gap-3">
@@ -162,14 +165,14 @@ export default function TakeQuizPage() {
               </div>
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Take Quiz</h1>
-          <p className="text-gray-600">Complete the quiz and submit your answers</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Take Quiz</h1>
+          <p className="text-gray-600 dark:text-gray-300">Complete the quiz and submit your answers</p>
         </div>
 
         {error && (
-          <Card className="shadow-sm border border-red-200 bg-red-50 mb-6">
+          <Card className="shadow-sm border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-700 mb-6">
             <CardContent className="p-6">
-              <p className="text-red-600">{error}</p>
+              <p className="text-red-600 dark:text-red-400">{error}</p>
             </CardContent>
           </Card>
         )}
@@ -177,7 +180,7 @@ export default function TakeQuizPage() {
         {!quiz && !error && (
           <div className="space-y-6">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse bg-white h-32 rounded-lg shadow-sm border border-gray-100" />
+              <div key={i} className="animate-pulse bg-white dark:bg-gray-800 h-32 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700" />
             ))}
           </div>
         )}
@@ -190,11 +193,11 @@ export default function TakeQuizPage() {
                 <Card key={q.id} className="shadow-sm border border-gray-100 dark:border-gray-700">
                   <CardHeader>
                     <div className="flex items-start space-x-4">
-                      <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-100 border border-gray-100 dark:border-gray-700">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
                         <span className="text-lg font-semibold text-gray-700 dark:text-gray-300">{idx + 1}</span>
                       </div>
                       <div className="flex-1">
-                        <CardTitle className="text-lg mb-2">{q.prompt}</CardTitle>
+                        <CardTitle className="text-lg mb-2 dark:text-white">{q.prompt}</CardTitle>
                       </div>
                     </div>
                   </CardHeader>
@@ -215,9 +218,9 @@ export default function TakeQuizPage() {
                                     ? 'border-green-200 bg-green-50'
                                     : isIncorrect
                                       ? 'border-red-200 bg-red-50'
-                                      : 'border-gray-300 bg-gray-50'
-                                  : 'border-gray-300 bg-gray-50'
-                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                      : 'border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-800'
+                                  : 'border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-800'
+                                : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
                             }`}
                           >
                             <input
@@ -232,7 +235,7 @@ export default function TakeQuizPage() {
                               className="w-4 h-4"
                               disabled={!!result}
                             />
-                            <span className="flex-1">{opt}</span>
+                            <span className="flex-1 dark:text-gray-200">{opt}</span>
                             {result && isSelected && (
                               <div className="flex-shrink-0">
                                 {isCorrect ? (
@@ -263,7 +266,7 @@ export default function TakeQuizPage() {
                       Submit Quiz
                     </Button>
                     {answers.some(a => a === -1) && (
-                      <p className="text-sm text-gray-600 text-center mt-3">
+                      <p className="text-sm text-gray-600 dark:text-gray-300 text-center mt-3">
                         Please answer all questions before submitting
                       </p>
                     )}
@@ -279,8 +282,8 @@ export default function TakeQuizPage() {
                 <Card className="shadow-sm border border-gray-100 dark:border-gray-700">
                   <CardHeader>
                     <div className="flex items-start space-x-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 ring-1 ring-green-200">
-                        <Trophy className="w-4 h-4 text-green-700" />
+                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-700">
+                        <Trophy className="w-4 h-4 text-green-700 dark:text-green-400" />
                       </div>
                       <div>
                         <CardTitle className="text-base">Quiz Results</CardTitle>
@@ -292,10 +295,10 @@ export default function TakeQuizPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-center">
-                      <div className="text-3xl font-bold text-gray-900 mb-2">
+                      <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                         {result.score}/{result.total}
                       </div>
-                      <div className="text-lg text-gray-600 mb-4">
+                      <div className="text-lg text-gray-600 dark:text-gray-300 mb-4">
                         {Math.round((result.score / result.total) * 100)}% Score
                       </div>
                       <Badge
@@ -321,8 +324,8 @@ export default function TakeQuizPage() {
                 <Card className="shadow-sm border border-gray-100 dark:border-gray-700">
                   <CardHeader>
                     <div className="flex items-start space-x-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 ring-1 ring-gray-200">
-                        <History className="w-4 h-4 text-gray-700" />
+                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                        <History className="w-4 h-4 text-gray-700 dark:text-gray-300" />
                       </div>
                       <div>
                         <CardTitle className="text-base">Previous Attempts</CardTitle>
@@ -337,12 +340,12 @@ export default function TakeQuizPage() {
                       {history.map((h) => (
                         <div key={h.id} className="flex items-center justify-between text-sm">
                           <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-600">
+                            <Clock className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                            <span className="text-gray-600 dark:text-gray-300">
                               {new Date(h.created_at).toLocaleDateString()}
                             </span>
                           </div>
-                          <div className="font-medium text-gray-900">
+                          <div className="font-medium text-gray-900 dark:text-white">
                             {h.score}/{h.total}
                           </div>
                         </div>
@@ -361,8 +364,8 @@ export default function TakeQuizPage() {
 
 function RequireAuth() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex items-center justify-center p-6">
-      <Card className="w-full max-w-md shadow-sm border border-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-6">
+      <Card className="w-full max-w-md shadow-sm border border-gray-100 dark:border-gray-700">
         <CardHeader className="text-center">
           <CardTitle>Access Required</CardTitle>
           <CardDescription>Please login to take quizzes</CardDescription>

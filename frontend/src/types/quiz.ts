@@ -1,6 +1,8 @@
 export type Quiz = {
   id: number;
   course_id: number;
+  syllabus_item_id?: number;
+  syllabus_item_title?: string;
   created_at: string;
   num_questions: number;
 };

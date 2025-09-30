@@ -51,18 +51,18 @@ export default function AITutorChat({ courseId, currentPage, totalPages, isVisib
     }
   }, [isVisible]);
 
-  // Add welcome message when chat first opens
+  // Add welcome message when chat first opens (only once)
   useEffect(() => {
     if (isVisible && messages.length === 0) {
       const welcomeMessage: Message = {
         id: `welcome-${Date.now()}`,
         role: 'assistant',
-        content: `Hello! I'm your AI tutor. I can help you understand the content on this page (${currentPage} of ${totalPages}). Feel free to ask me questions about what you're reading, request explanations, or ask for study tips!`,
+        content: `Hello! I'm your AI tutor. I can help you understand the content you're reading. Feel free to ask me questions about what you're reading, request explanations, or ask for study tips!`,
         timestamp: new Date()
       };
       setMessages([welcomeMessage]);
     }
-  }, [isVisible, currentPage, totalPages]);
+  }, [isVisible]); // Remove dependencies on currentPage and totalPages
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,15 +133,15 @@ export default function AITutorChat({ courseId, currentPage, totalPages, isVisib
   if (!isVisible) return null;
 
   return (
-    <Card className="w-80 h-[80vh] flex flex-col shadow-sm border border-gray-100">
-      <CardHeader className="pb-3">
+    <Card className="w-80 h-[80vh] flex flex-col shadow-sm border border-gray-100 dark:border-gray-700">
+      <CardHeader className="pb-3 flex-shrink-0">
         <div className="flex items-start space-x-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 border border-blue-200">
-            <Bot className="w-4 h-4 text-blue-700" />
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+            <Bot className="w-4 h-4 text-gray-700 dark:text-gray-300" />
           </div>
           <div className="flex-1">
             <CardTitle className="text-sm">AI Tutor</CardTitle>
-            <p className="text-xs text-gray-600 mt-1">
+            <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
               <BookOpen className="w-3 h-3 inline mr-1" />
               Page {currentPage} of {totalPages}
             </p>
@@ -149,9 +149,9 @@ export default function AITutorChat({ courseId, currentPage, totalPages, isVisib
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col p-0">
+      <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto px-4" ref={scrollAreaRef}>
+        <div className="flex-1 overflow-y-auto px-4 min-h-0" ref={scrollAreaRef}>
           <div className="space-y-4 pb-4">
             {messages.map((message) => (
               <div
@@ -159,26 +159,26 @@ export default function AITutorChat({ courseId, currentPage, totalPages, isVisib
                 className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {message.role === 'assistant' && (
-                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 flex-shrink-0 mt-1">
-                    <Bot className="w-3 h-3 text-blue-700" />
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex-shrink-0 mt-1">
+                    <Bot className="w-3 h-3 text-gray-700 dark:text-gray-300" />
                   </div>
                 )}
 
                 <div className={`max-w-[240px] rounded-lg p-3 ${
                   message.role === 'user'
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-900'
+                    ? 'bg-gray-900 text-white dark:bg-gray-700 dark:text-gray-100'
+                    : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100'
                 }`}>
                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                   <div className="flex items-center justify-between mt-2">
                     <span className={`text-xs ${
-                      message.role === 'user' ? 'text-gray-300' : 'text-gray-500'
+                      message.role === 'user' ? 'text-gray-300 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400'
                     }`}>
                       {formatTime(message.timestamp)}
                     </span>
                     {message.pageContext && (
                       <span className={`text-xs ${
-                        message.role === 'user' ? 'text-gray-300' : 'text-gray-500'
+                        message.role === 'user' ? 'text-gray-300 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400'
                       }`}>
                         p.{message.pageContext}
                       </span>
@@ -196,10 +196,10 @@ export default function AITutorChat({ courseId, currentPage, totalPages, isVisib
 
             {isLoading && (
               <div className="flex gap-3 justify-start">
-                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 flex-shrink-0 mt-1">
-                  <Bot className="w-3 h-3 text-blue-700" />
+                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex-shrink-0 mt-1">
+                  <Bot className="w-3 h-3 text-gray-700 dark:text-gray-300" />
                 </div>
-                <div className="bg-gray-100 rounded-lg p-3">
+                <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3">
                   <div className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
                     <span className="text-sm text-gray-600">Thinking...</span>
@@ -211,7 +211,7 @@ export default function AITutorChat({ courseId, currentPage, totalPages, isVisib
         </div>
 
         {/* Input Area */}
-        <div className="border-t border-gray-100 p-4">
+        <div className="border-t border-gray-100 dark:border-gray-700 p-4 flex-shrink-0">
           <form onSubmit={sendMessage} className="flex gap-2">
             <Input
               ref={inputRef}
@@ -235,7 +235,7 @@ export default function AITutorChat({ courseId, currentPage, totalPages, isVisib
               )}
             </Button>
           </form>
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
             <MessageCircle className="w-3 h-3 inline mr-1" />
             Ask questions about page {currentPage}
           </p>
