@@ -6,7 +6,7 @@
 
 ---
 
-## ✨ Features
+## Features
 
 - **Smart Course Creation** – Upload PDFs or text files and get an AI-generated syllabus
 - **Auto-Generated Quizzes** – Practice with multiple-choice quizzes created from your course content
@@ -14,7 +14,7 @@
 - **Progress Tracking** – Mark items complete and track your learning journey
 - **Community Courses** – Share and discover courses from other learners
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Backend
 ```bash
@@ -38,13 +38,13 @@ Visit `http://localhost:3000` and create an account to get started.
 docker compose up --build
 ```
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Backend**: FastAPI, SQLModel, SQLite
 - **Frontend**: Next.js 14, TypeScript, Tailwind CSS
 - **AI**: OpenAI GPT for content generation
 
-## 📹 Demo
+## Demo
 
 <!-- Add your demo video here -->
 
