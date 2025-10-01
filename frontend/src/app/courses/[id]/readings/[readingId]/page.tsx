@@ -6,23 +6,24 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  BookOpen,
-  Brain,
-  Download,
+  Send,
   Loader2,
-  FileText
+  Sparkles,
+  X
 } from "lucide-react";
 import { getDocument } from "pdfjs-dist";
 import "@/lib/pdf-worker";
+
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  pageContext?: number;
+};
 
 export default function ReadingPage() {
   const { auth } = useAuth();
@@ -30,13 +31,27 @@ export default function ReadingPage() {
   const [start, setStart] = useState<number | null>(null);
   const [end, setEnd] = useState<number | null>(null);
   const [page, setPage] = useState<number | null>(null);
-  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [rendering, setRendering] = useState(false);
   const pdfDocRef = useRef<any | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // AI Tutor state
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputMessage, setInputMessage] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [showAITutor, setShowAITutor] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   useEffect(() => {
     if (!auth.token || !params?.id || !params?.readingId) return;
@@ -54,7 +69,7 @@ export default function ReadingPage() {
     })();
   }, [auth.token, params?.id, params?.readingId]);
 
-  // Load PDF document via pdf.js
+  // Load PDF document
   useEffect(() => {
     if (!auth.token || !params?.id) return;
     if (!start || !end) return;
@@ -62,7 +77,6 @@ export default function ReadingPage() {
     async function loadPdf() {
       try {
         setLoadingPdf(true);
-        // Worker is already configured globally
         const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         const token = localStorage.getItem("token") || "";
         const url = `${base}/courses/${params.id}/pdf?token=${encodeURIComponent(token)}`;
@@ -73,7 +87,6 @@ export default function ReadingPage() {
         const doc = await loadingTask.promise;
         if (cancelled) return;
         pdfDocRef.current = doc;
-        // Ensure current page is within range
         setPage((prev) => {
           if (start == null || end == null) return prev;
           const p = prev ?? start;
@@ -92,7 +105,7 @@ export default function ReadingPage() {
     };
   }, [auth.token, params?.id, start, end]);
 
-  // Render current page into canvas
+  // Render current page
   useEffect(() => {
     async function renderPage() {
       const doc = pdfDocRef.current;
@@ -106,7 +119,7 @@ export default function ReadingPage() {
         const pdfPage = await doc.getPage(current);
         const dpr = window.devicePixelRatio || 1;
         const initialViewport = pdfPage.getViewport({ scale: 1 });
-        const targetWidth = container.clientWidth || initialViewport.width;
+        const targetWidth = container.clientWidth - 40; // Account for padding
         const scale = targetWidth / initialViewport.width;
         const viewport = pdfPage.getViewport({ scale });
         const context = canvas.getContext("2d");
@@ -136,194 +149,275 @@ export default function ReadingPage() {
     }
   }
 
+  async function handleSendMessage() {
+    if (!inputMessage.trim() || isStreaming || !page) return;
+
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: inputMessage.trim(),
+      pageContext: page
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputMessage("");
+    setIsStreaming(true);
+
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(`${base}/courses/${params.id}/ai-tutor/stream`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          message: userMessage.content,
+          page_number: page,
+          conversation_history: messages
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to get AI response");
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = "";
+
+      // Add empty assistant message that we'll update
+      setMessages(prev => [...prev, { role: "assistant", content: "", pageContext: page }]);
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const data = line.substring(6);
+              if (data === "[DONE]") {
+                break;
+              }
+              accumulatedContent += data;
+              // Update the last message (assistant's message)
+              setMessages(prev => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1] = {
+                  role: "assistant",
+                  content: accumulatedContent,
+                  pageContext: page
+                };
+                return newMessages;
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      toast.error("Failed to send message");
+      console.error(error);
+      // Remove the empty assistant message if error occurred
+      setMessages(prev => prev.slice(0, -1));
+    } finally {
+      setIsStreaming(false);
+    }
+  }
+
   if (!auth.token) return <RequireAuth />;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
-      <div className="container mx-auto px-6 py-8 max-w-6xl">
-        {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/courses/${params?.id}`} className="flex items-center gap-2">
-                <ArrowLeft className="w-4 h-4" />
-                Back to Course
-              </Link>
-            </Button>
-            {start && end && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <FileText className="w-4 h-4" />
-                Pages {start}–{end}
-              </div>
-            )}
-          </div>
+    <div className="h-screen flex flex-col bg-white dark:bg-gray-900">
+      {/* Compact Header */}
+      <div className="flex-none border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+        <div className="flex items-center justify-between px-4 py-3">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/courses/${params?.id}`} className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </Link>
+          </Button>
 
-          {error && (
-            <Card className="shadow-sm ring-1 ring-red-200 bg-red-50 mb-6">
-              <CardContent className="p-4">
-                <p className="text-red-600">{error}</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* PDF Viewer Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-3">
-            <Card className="shadow-sm border border-gray-100 dark:border-gray-700">
-              <CardContent className="p-0">
-                <div ref={containerRef} className="h-[80vh] rounded-lg overflow-auto bg-white flex items-start justify-center">
-                  <div className="p-4">
-                    {loadingPdf ? (
-                      <div className="h-[60vh] flex items-center justify-center text-gray-500">
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" /> Loading PDF...
-                      </div>
-                    ) : (
-                      <canvas ref={canvasRef} className="shadow-sm border border-gray-100 rounded" />
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Navigation Controls */}
-            <Card className="shadow-sm border border-gray-100 dark:border-gray-700 mt-6">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-center gap-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === (start ?? 1)}
-                    onClick={() => {
-                      const next = (start ?? 1);
-                      setPage(next);
-                      saveProgress(next);
-                    }}
-                  >
-                    <ChevronsLeft className="w-4 h-4" />
-                    First
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === (start ?? 1)}
-                    onClick={() => {
-                      const next = Math.max((start ?? 1), (page ?? 1) - 1);
-                      setPage(next);
-                      saveProgress(next);
-                    }}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    Prev
-                  </Button>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">Page</span>
-                    <Input
-                      type="number"
-                      value={page ?? ''}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value || '0');
-                      const s = start ?? 1; const ee = end ?? s;
-                      const clamped = Math.min(Math.max(v, s), ee);
-                      setPage(clamped);
-                    }}
-                      onBlur={() => {
-                      if (page != null) saveProgress(page);
-                      }}
-                      className="w-20 text-center"
-                      min={start ?? 1}
-                      max={end ?? 1}
-                    />
-                    <span className="text-sm text-gray-600">of {end ?? "?"}</span>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === (end ?? 1)}
-                    onClick={() => {
-                      const next = Math.min((end ?? 1), (page ?? 1) + 1);
-                      setPage(next);
-                      saveProgress(next);
-                    }}
-                  >
-                    Next
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === (end ?? 1)}
-                    onClick={() => {
-                      const next = (end ?? 1);
-                      setPage(next);
-                      saveProgress(next);
-                    }}
-                  >
-                    Last
-                    <ChevronsRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <Card className="shadow-sm border border-gray-100 dark:border-gray-700">
-              <CardHeader>
-                <div className="flex items-start space-x-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 ring-1 ring-gray-200">
-                    <Brain className="w-4 h-4 text-gray-700" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">Study Tools</CardTitle>
-                    <CardDescription className="text-sm">
-                      Generate content from this reading
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
+          {start && end && (
+            <div className="flex items-center gap-4">
+              {/* Page Navigation */}
+              <div className="flex items-center gap-2">
                 <Button
-                  className="w-full justify-start bg-gray-900 hover:bg-gray-800 cursor-pointer"
-                  disabled={generating}
-                  onClick={async () => {
-                    try {
-                      setGenerating(true);
-                      const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-                      const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
-                      const r = await fetch(`${base}/courses/readings/${params?.readingId}/quizzes/generate`, { method: "POST", headers });
-                      if (!r.ok) throw new Error("Failed to generate reading quiz");
-                      const q = await r.json();
-                      toast.success("Quiz generated");
-                      window.location.href = `/courses/${params?.id}/quizzes/${q.id}`;
-                    } catch (e: unknown) {
-                      toast.error(e instanceof Error ? e.message : "Failed to generate quiz");
-                    } finally {
-                      setGenerating(false);
-                    }
+                  variant="ghost"
+                  size="sm"
+                  disabled={page === start}
+                  onClick={() => {
+                    const next = Math.max(start, (page ?? start) - 1);
+                    setPage(next);
+                    saveProgress(next);
                   }}
                 >
-                  {generating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Brain className="w-4 h-4 mr-2" />
-                      Generate Quiz
-                    </>
-                  )}
+                  <ChevronLeft className="w-4 h-4" />
                 </Button>
-              </CardContent>
-            </Card>
+
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    value={page ?? ''}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value || '0');
+                      const clamped = Math.min(Math.max(v, start), end);
+                      setPage(clamped);
+                    }}
+                    onBlur={() => {
+                      if (page != null) saveProgress(page);
+                    }}
+                    className="w-16 h-8 text-center text-sm"
+                    min={start}
+                    max={end}
+                  />
+                  <span className="text-sm text-gray-500">/ {end}</span>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={page === end}
+                  onClick={() => {
+                    const next = Math.min(end, (page ?? start) + 1);
+                    setPage(next);
+                    saveProgress(next);
+                  }}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {/* Toggle AI Tutor */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAITutor(!showAITutor)}
+                className="flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                {showAITutor ? "Hide" : "Show"} AI Tutor
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <div className="flex-none bg-red-50 border-b border-red-200 px-4 py-2">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
+
+      {/* Main Content Area - 50/50 Split */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* PDF Viewer - Left Side */}
+        <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-800">
+          <div ref={containerRef} className="flex-1 overflow-auto flex items-start justify-center p-6">
+            {loadingPdf ? (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <Loader2 className="w-6 h-6 mr-2 animate-spin" /> Loading PDF...
+              </div>
+            ) : (
+              <canvas ref={canvasRef} className="shadow-lg" />
+            )}
           </div>
         </div>
+
+        {/* AI Tutor - Right Side */}
+        {showAITutor && (
+          <div className="flex-none w-1/2 flex flex-col border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+            {/* AI Tutor Header */}
+            <div className="flex-none border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">AI Tutor</h2>
+                    <p className="text-sm text-gray-500">Ask questions about page {page}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {messages.length === 0 ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center text-gray-500 max-w-sm">
+                    <Sparkles className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                    <p className="text-sm">
+                      Ask me anything about the content on this page! I have access to the text and can help explain concepts, answer questions, and provide study tips.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                messages.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                        msg.role === "user"
+                          ? "bg-gray-900 text-white"
+                          : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
+                      }`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      {msg.pageContext && (
+                        <p className="text-xs mt-1 opacity-60">Page {msg.pageContext}</p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+              {isStreaming && messages[messages.length - 1]?.content === "" && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3">
+                    <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input Area */}
+            <div className="flex-none border-t border-gray-200 dark:border-gray-700 p-4">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendMessage();
+                }}
+                className="flex gap-2"
+              >
+                <Input
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  placeholder="Ask a question about this page..."
+                  disabled={isStreaming || !page}
+                  className="flex-1"
+                  autoFocus
+                />
+                <Button
+                  type="submit"
+                  disabled={!inputMessage.trim() || isStreaming || !page}
+                  className="bg-gray-900 hover:bg-gray-800"
+                >
+                  {isStreaming ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -332,17 +426,13 @@ export default function ReadingPage() {
 function RequireAuth() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex items-center justify-center p-6">
-      <Card className="w-full max-w-md shadow-sm ring-1 ring-gray-200">
-        <CardHeader className="text-center">
-          <CardTitle>Access Required</CardTitle>
-          <CardDescription>Please login to view this reading</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild className="w-full bg-gray-900 hover:bg-gray-800">
-            <Link href="/auth">Login / Register</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="w-full max-w-md bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Required</h2>
+        <p className="text-gray-600 mb-6">Please login to view this reading</p>
+        <Button asChild className="w-full bg-gray-900 hover:bg-gray-800">
+          <Link href="/auth">Login / Register</Link>
+        </Button>
+      </div>
     </div>
   );
 }

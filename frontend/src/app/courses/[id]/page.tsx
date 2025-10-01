@@ -411,7 +411,8 @@ export default function CourseDetailPage() {
                   <div className="space-y-4">
                     {course.syllabus.map((item, index) => {
                       const isCompleted = completedIds.includes(item.id);
-                      const relatedReadings = readings.filter(r => r.order_index === item.order_index);
+                      // Use syllabus_item_id to avoid duplicates from multiple uploads
+                      const relatedReadings = readings.filter(r => r.syllabus_item_id === item.id);
 
                       return (
                         <div key={item.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:border-gray-300 dark:hover:border-gray-500 transition-colors">

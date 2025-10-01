@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Upload } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
+import { CourseCreationProgress } from "@/components/CourseCreationProgress";
 
 export default function CoursesPage() {
   const { auth } = useAuth();
@@ -95,6 +96,11 @@ function UploadForm({ onUploaded }: { onUploaded: (c: Course) => void }) {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Progress modal state
+  const [showProgress, setShowProgress] = useState(false);
+  const [creatingCourse, setCreatingCourse] = useState<{ id: number; title: string } | null>(null);
+  const [isMinimized, setIsMinimized] = useState(false);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -102,24 +108,46 @@ function UploadForm({ onUploaded }: { onUploaded: (c: Course) => void }) {
     try {
       if (!file) { setLoading(false); return; }
       const created = await api.uploadCourse(file, title || file.name, topics || undefined);
-      onUploaded(created);
+
+      // Show progress modal
+      setCreatingCourse({ id: created.id, title: created.title });
+      setShowProgress(true);
+      setLoading(false);
+
+      // Clear form
       setTitle("");
       setFile(null);
       setTopics("");
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-      toast.success("Course created successfully! Redirecting...");
-      // Call the callback to handle navigation and cache clearing
-      setTimeout(() => onUploaded(created), 1000);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to upload";
       setError(errorMessage);
       toast.error(errorMessage);
-    } finally {
       setLoading(false);
     }
   }
+
+  const handleComplete = () => {
+    setShowProgress(false);
+    setCreatingCourse(null);
+    setIsMinimized(false);
+    if (creatingCourse) {
+      toast.success("Course created successfully! Redirecting...");
+      setTimeout(() => {
+        // Clear the course cache to force refresh
+        sessionStorage.removeItem('summit_courses');
+        onUploaded({ id: creatingCourse.id, title: creatingCourse.title } as Course);
+      }, 500);
+    }
+  };
+
+  const handleMinimize = () => {
+    setShowProgress(false);
+    setIsMinimized(true);
+    toast.success("Course creation continues in background", { duration: 2000 });
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -194,7 +222,7 @@ function UploadForm({ onUploaded }: { onUploaded: (c: Course) => void }) {
           {loading ? (
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Creating course...
+              Uploading...
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -204,6 +232,38 @@ function UploadForm({ onUploaded }: { onUploaded: (c: Course) => void }) {
           )}
         </Button>
       </div>
+
+      {/* Minimized indicator */}
+      {isMinimized && creatingCourse && (
+        <div className="fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          <div>
+            <p className="text-sm font-medium">Creating: {creatingCourse.title}</p>
+            <p className="text-xs opacity-90">Processing in background...</p>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setShowProgress(true);
+              setIsMinimized(false);
+            }}
+            className="text-white hover:bg-blue-700"
+          >
+            Show
+          </Button>
+        </div>
+      )}
+
+      {/* Progress modal */}
+      {showProgress && creatingCourse && (
+        <CourseCreationProgress
+          courseId={creatingCourse.id}
+          courseName={creatingCourse.title}
+          onComplete={handleComplete}
+          onMinimize={handleMinimize}
+        />
+      )}
     </form>
   );
 }

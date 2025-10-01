@@ -52,6 +52,11 @@ class Course(SQLModel, table=True):
     raw_text: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+    # Progress tracking
+    status: str = Field(default="uploading")  # uploading, extracting_toc, extracting_headers, ai_processing, creating_readings, complete, error
+    status_message: Optional[str] = None
+    progress_percent: int = Field(default=0)
+
     # Relationship fields are omitted in MVP to simplify mapping
 
 
@@ -85,6 +90,9 @@ class CourseRead(SQLModel):
     num_pages: Optional[int] = None
     topics: Optional[str] = None
     created_at: datetime
+    status: str
+    status_message: Optional[str] = None
+    progress_percent: int
 
 
 class SyllabusItemRead(SQLModel):

@@ -8,7 +8,7 @@ from sqlmodel import Session, select, delete
 
 from .auth import get_current_user
 from .db import get_session
-from .ai import generate_syllabus, should_use_ai, summarize_section, extract_toc_from_text
+from .ai import generate_syllabus, should_use_ai, summarize_section, generate_intelligent_syllabus
 import logging
 
 logger = logging.getLogger("summit.courses")
@@ -73,10 +73,27 @@ def _naive_syllabus_from_text(text: str, max_items: int = 8) -> list[tuple[str, 
     return items
 
 
+
+
 @router.get("/", response_model=List[CourseRead])
 def list_courses(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> list[CourseRead]:
     courses = session.exec(select(Course).where(Course.user_id == current_user.id).order_by(Course.created_at.desc())).all()
     return courses
+
+
+@router.get("/{course_id}/status")
+def get_course_status(course_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    course = session.get(Course, course_id)
+    if not course or course.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    return {
+        "id": course.id,
+        "title": course.title,
+        "status": course.status,
+        "status_message": course.status_message,
+        "progress_percent": course.progress_percent
+    }
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
@@ -114,14 +131,34 @@ def upload_course(
         except Exception:
             num_pages = None
 
-    # Create course
-    course = Course(user_id=current_user.id, title=title, source_filename=file.filename, pdf_path=pdf_path, num_pages=num_pages or None, topics=topics, raw_text=raw_text)
+    # Create course with initial status
+    course = Course(
+        user_id=current_user.id,
+        title=title,
+        source_filename=file.filename,
+        pdf_path=pdf_path,
+        num_pages=num_pages or None,
+        topics=topics,
+        raw_text=raw_text,
+        status="uploading",
+        status_message=f"Uploaded {file.filename}" if file.filename else "Uploaded file",
+        progress_percent=10
+    )
     session.add(course)
     session.commit()
     session.refresh(course)
 
+    # Helper function to update status
+    def update_status(status: str, message: str, percent: int):
+        course.status = status
+        course.status_message = message
+        course.progress_percent = percent
+        session.add(course)
+        session.commit()
+
     # Extract and store PDF page content for quick access
     if pdf_path and num_pages:
+        update_status("extracting_pages", f"Extracting content from {num_pages} pages", 20)
         try:
             import fitz  # type: ignore
             with fitz.open(pdf_path) as doc:
@@ -138,7 +175,7 @@ def upload_course(
         except Exception as e:
             logger.warning("Failed to extract PDF pages: %s", e, exc_info=True)
 
-    # Build syllabus (AI if enabled). For PDFs, prefer deriving titles from page samples.
+    # Build syllabus using NEW intelligent AI-driven approach
     use_ai = should_use_ai()
     logger.info(
         "upload_course: user_id=%s, title=%r, content_type=%r, pdf_path=%r, num_pages=%r, use_ai=%s",
@@ -149,67 +186,109 @@ def upload_course(
         num_pages,
         use_ai,
     )
-    items = []
-    if not raw_text and pdf_path and num_pages:
-        # Extract a simple TOC-like list by sampling the first line of every N pages
-        try:
-            import fitz  # type: ignore
-            with fitz.open(pdf_path) as doc:
-                # Try TOC extraction by sending first ~30 pages of text
-                pages_text = []
-                for i in range(0, min(doc.page_count, 30)):
-                    pages_text.append(doc[i].get_text())
-                toc_candidates = extract_toc_from_text("\n".join(pages_text), max_items=12, use_ai=use_ai)
-                logger.info("upload_course: TOC candidates count=%d", len(toc_candidates) if toc_candidates else 0)
-                if toc_candidates:
-                    for obj in toc_candidates[:8]:
-                        title = str(obj.get("title", ""))[:120] or "Section"
-                        # We could map page numbers later; for summary, use early page text chunk
-                        idx = max(0, (obj.get("page") or 1) - 1)
-                        sample_text = doc[idx].get_text() if 0 <= idx < doc.page_count else pages_text[0]
-                        summary = summarize_section(title, sample_text[:2000], use_ai=use_ai)
-                        items.append((title, summary))
-                # If AI TOC not available, fall back to sampling evenly
-                if not items:
-                    logger.info("upload_course: AI TOC unavailable; falling back to page sampling")
-                    step = max(1, doc.page_count // 8)
-                    for i in range(0, doc.page_count, step):
-                        page = doc[i]
-                        text = page.get_text().strip()
-                        first_line = text.splitlines()[0] if text else f"Section {i+1}"
-                        title = first_line[:120]
-                        summary = summarize_section(title, text[:2000], use_ai=use_ai)
-                        items.append((title or f"Section {i+1}", summary))
-                items = items[:8]
-        except Exception:
-            logger.warning("upload_course: PDF processing failed; will try text-based syllabus", exc_info=True)
-            items = []
-    if not items:
-        logger.info("upload_course: generating syllabus from text (len=%d), use_ai=%s", len(raw_text), use_ai)
-        items = generate_syllabus(raw_text, max_items=8, use_ai=use_ai, topics=topics or None)
-    created_items: list[SyllabusItem] = []
-    for idx, (it_title, it_summary) in enumerate(items):
-        si = SyllabusItem(course_id=course.id, order_index=idx, title=it_title, summary=it_summary)
-        session.add(si)
-        created_items.append(si)
-    session.commit()
 
-    # Derive reading ranges across PDF pages if available (simple equal split)
-    readings_created: list[Reading] = []
-    if num_pages and num_pages > 0 and created_items:
-        pages_per = max(1, num_pages // max(1, len(created_items)))
-        start = 1
-        for idx, si in enumerate(created_items):
-            end = num_pages if idx == len(created_items) - 1 else min(num_pages, start + pages_per - 1)
-            r = Reading(course_id=course.id, syllabus_item_id=si.id, order_index=si.order_index, title=si.title, start_page=start, end_page=end)
+    # For PDFs, use the new intelligent syllabus generation
+    if pdf_path and num_pages:
+        logger.info("upload_course: using intelligent AI syllabus generation for %d pages", num_pages)
+
+        update_status("extracting_toc", "Extracting table of contents", 30)
+
+        # Create debug log path
+        from datetime import datetime
+        debug_log_dir = os.getenv("DEBUG_LOG_DIR", "./storage/syllabus_logs")
+        os.makedirs(debug_log_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_title = "".join(c if c.isalnum() or c in (' ', '_') else '_' for c in title)[:50]
+        debug_log_path = os.path.join(debug_log_dir, f"{timestamp}_{safe_title}.log")
+
+        update_status("extracting_headers", "Analyzing document structure", 40)
+
+        update_status("ai_processing", "Generating syllabus with AI", 50)
+
+        # Returns list of dicts with: {title, summary, start_page, end_page}
+        syllabus_data = generate_intelligent_syllabus(pdf_path, num_pages, use_ai=use_ai, debug_log_path=debug_log_path)
+
+        logger.info(f"Syllabus generation debug log saved to: {debug_log_path}")
+
+        created_items: list[SyllabusItem] = []
+        readings_created: list[Reading] = []
+
+        for idx, item_data in enumerate(syllabus_data):
+            # Create syllabus item
+            si = SyllabusItem(
+                course_id=course.id,
+                order_index=idx,
+                title=item_data["title"],
+                summary=item_data["summary"]
+            )
+            session.add(si)
+            created_items.append(si)
+
+        session.commit()  # Commit to get syllabus item IDs
+
+        update_status("creating_readings", f"Creating {len(syllabus_data)} reading sections", 80)
+
+        # Now create readings with the page ranges from AI
+        for idx, item_data in enumerate(syllabus_data):
+            si = created_items[idx]
+            r = Reading(
+                course_id=course.id,
+                syllabus_item_id=si.id,
+                order_index=si.order_index,
+                title=si.title,
+                start_page=item_data["start_page"],
+                end_page=item_data["end_page"]
+            )
             session.add(r)
             readings_created.append(r)
-            start = end + 1
+
         session.commit()
+
+        update_status("complete", f"Course ready with {len(created_items)} chapters", 100)
+
+    # For text files, use old text-based generation (fallback)
+    else:
+        update_status("ai_processing", "Generating syllabus from text", 50)
+        logger.info("upload_course: generating syllabus from text (len=%d), use_ai=%s", len(raw_text), use_ai)
+        items = generate_syllabus(raw_text, max_items=12, use_ai=use_ai, topics=topics or None)
+        created_items: list[SyllabusItem] = []
+        for idx, (it_title, it_summary) in enumerate(items):
+            si = SyllabusItem(course_id=course.id, order_index=idx, title=it_title, summary=it_summary)
+            session.add(si)
+            created_items.append(si)
+        session.commit()
+
+        update_status("creating_readings", f"Creating {len(items)} reading sections", 80)
+
+        # Simple equal page split for text files
+        readings_created: list[Reading] = []
+        if num_pages and num_pages > 0 and created_items:
+            pages_per = max(1, num_pages // max(1, len(created_items)))
+            start = 1
+            for idx, si in enumerate(created_items):
+                end = num_pages if idx == len(created_items) - 1 else min(num_pages, start + pages_per - 1)
+                r = Reading(course_id=course.id, syllabus_item_id=si.id, order_index=si.order_index, title=si.title, start_page=start, end_page=end)
+                session.add(r)
+                readings_created.append(r)
+                start = end + 1
+            session.commit()
+
+        update_status("complete", f"Course ready with {len(created_items)} chapters", 100)
 
     # Read back with ids
     data = [SyllabusItemRead(id=it.id, order_index=it.order_index, title=it.title, summary=it.summary) for it in created_items]
-    return CourseReadWithSyllabus(id=course.id, title=course.title, source_filename=course.source_filename, num_pages=course.num_pages, topics=course.topics, created_at=course.created_at, syllabus=data)
+    return CourseReadWithSyllabus(
+        id=course.id,
+        title=course.title,
+        source_filename=course.source_filename,
+        num_pages=course.num_pages,
+        topics=course.topics,
+        created_at=course.created_at,
+        status=course.status,
+        status_message=course.status_message,
+        progress_percent=course.progress_percent,
+        syllabus=data
+    )
 
 
 @router.get("/{course_id}/readings", response_model=list[ReadingRead])
@@ -280,7 +359,18 @@ async def get_course(course_id: int, current_user: User = Depends(get_current_us
         raise HTTPException(status_code=404, detail="Course not found")
     items = session.exec(select(SyllabusItem).where(SyllabusItem.course_id == course.id).order_by(SyllabusItem.order_index)).all()
     items_read = [SyllabusItemRead(id=it.id, order_index=it.order_index, title=it.title, summary=it.summary) for it in items]
-    return CourseReadWithSyllabus(id=course.id, title=course.title, source_filename=course.source_filename, created_at=course.created_at, syllabus=items_read)
+    return CourseReadWithSyllabus(
+        id=course.id,
+        title=course.title,
+        source_filename=course.source_filename,
+        num_pages=course.num_pages,
+        topics=course.topics,
+        created_at=course.created_at,
+        status=course.status,
+        status_message=course.status_message,
+        progress_percent=course.progress_percent,
+        syllabus=items_read
+    )
 
 
 @router.put("/{course_id}", response_model=CourseRead)
@@ -302,7 +392,10 @@ async def update_course(course_id: int, payload: dict, current_user: User = Depe
         source_filename=course.source_filename,
         num_pages=course.num_pages,
         topics=course.topics,
-        created_at=course.created_at
+        created_at=course.created_at,
+        status=course.status,
+        status_message=course.status_message,
+        progress_percent=course.progress_percent
     )
 
 
@@ -315,6 +408,15 @@ async def delete_course(course_id: int, current_user: User = Depends(get_current
     # Delete dependent rows (no FKs with cascade configured in MVP)
     session.exec(delete(SyllabusCompletion).where(SyllabusCompletion.course_id == course_id))
     session.exec(delete(ScheduleItem).where(ScheduleItem.course_id == course_id))
+
+    # Delete readings and reading progress
+    reading_ids = [rid for rid in session.exec(select(Reading.id).where(Reading.course_id == course_id)).all()]
+    if reading_ids:
+        session.exec(delete(ReadingProgress).where(ReadingProgress.reading_id.in_(reading_ids)))
+    session.exec(delete(Reading).where(Reading.course_id == course_id))
+
+    # Delete PDF pages
+    session.exec(delete(PDFPage).where(PDFPage.course_id == course_id))
 
     # Quizzes and related
     quiz_ids = [qid for qid in session.exec(select(Quiz.id).where(Quiz.course_id == course_id)).all()]

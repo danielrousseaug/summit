@@ -151,7 +151,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         isCollapsed
           ? 'bg-white dark:bg-gray-900'
           : 'bg-[#f9f9f9] dark:bg-gray-900'
-      } border-r border-gray-200 dark:border-gray-800 flex flex-col transition-all duration-300`}>
+      } border-r border-gray-200 dark:border-gray-800 flex flex-col transition-all duration-300 overflow-x-hidden`}>
         {/* Header */}
         <div className="px-4 py-4">
           <div className="flex items-center px-3 py-2 h-10 relative">
@@ -255,7 +255,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 </div>
 
         {/* Courses List */}
-        <div className={`flex-1 overflow-y-auto transition-all duration-150 ${
+        <div className={`flex-1 overflow-y-auto overflow-x-hidden transition-all duration-300 ${
           isCollapsed ? "opacity-0 max-h-0" : "opacity-100 max-h-full"
         }`}>
           <div className="px-4 pb-4">

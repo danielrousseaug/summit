@@ -98,8 +98,9 @@ export default function MinimalPDFViewer({
       try {
         const doc = pdfDocRef.current;
         const canvas = canvasRef.current;
+        if (!doc || !canvas) return;
         const container = canvas.parentElement;
-        if (!doc || !canvas || !container) return;
+        if (!container) return;
 
         const pdfPage = await doc.getPage(page);
 

@@ -44,14 +44,26 @@ export const api = {
     form.append("file", file);
     form.append("title", title);
     if (topics) form.append("topics", topics);
-    const headers = typeof window !== "undefined" ? (getAuthHeader() as Record<string, string>) : {};
+
+    // Check for auth token
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) {
+      throw new Error("Not authenticated. Please log in again.");
+    }
+
     const resp = await fetch(`${BASE_URL}/courses/upload`, {
       method: "POST",
-      headers, // don't set content-type so browser adds boundary
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
       body: form,
       credentials: "include",
     });
-    if (!resp.ok) throw new Error(`Upload failed ${resp.status}`);
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      throw new Error(`Upload failed ${resp.status}: ${text || resp.statusText}`);
+    }
     return (await resp.json()) as import("@/types/course").CourseWithSyllabus;
   },
   renameCourse: (courseId: number, newTitle: string) =>

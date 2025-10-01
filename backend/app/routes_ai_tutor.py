@@ -5,12 +5,13 @@ import logging
 import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from pydantic import BaseModel
 
 from .auth import get_current_user
 from .db import get_session
-from .models import User, Course
+from .models import User, Course, PDFPage
 from .ai import should_use_ai
 
 logger = logging.getLogger("summit.ai_tutor")
@@ -36,56 +37,57 @@ class AITutorResponse(BaseModel):
 
 
 def _extract_page_content_from_pdf(course_id: int, page_number: int, session: Session) -> str:
-    """Extract content from a specific PDF page using PyMuPDF."""
+    """Extract content from stored PDF pages in database."""
 
-    # Get course to find PDF path
+    # Get course to verify it exists
     course = session.get(Course, course_id)
     if not course:
         return "Course content not available."
 
-    # Try to extract from PDF if available
     try:
-        import pymupdf  # PyMuPDF
+        # Get the current page content from database
+        current_page = session.exec(
+            select(PDFPage).where(
+                (PDFPage.course_id == course_id) &
+                (PDFPage.page_number == page_number)
+            )
+        ).first()
 
-        # Construct the PDF path
-        pdf_path = f"storage/course_{course_id}.pdf"
-
-        if not os.path.exists(pdf_path):
-            # Fallback to text-based extraction
+        if not current_page:
+            logger.warning(f"No stored content for course {course_id}, page {page_number}")
             return _extract_page_content(course.raw_text or "", page_number)
 
-        # Open the PDF
-        doc = pymupdf.open(pdf_path)
-
-        # Ensure page number is valid
-        if page_number < 1 or page_number > doc.page_count:
-            page_number = min(max(1, page_number), doc.page_count)
-
-        # Extract text from the current page and surrounding pages for context
         content_parts = []
 
         # Get previous page for context (if exists)
         if page_number > 1:
-            prev_page = doc[page_number - 2]  # 0-indexed
-            prev_text = prev_page.get_text()
-            if len(prev_text) > 500:  # Limit previous page content
-                prev_text = "..." + prev_text[-500:]
-            content_parts.append(f"[Context from page {page_number - 1}]\n{prev_text}\n")
+            prev_page = session.exec(
+                select(PDFPage).where(
+                    (PDFPage.course_id == course_id) &
+                    (PDFPage.page_number == page_number - 1)
+                )
+            ).first()
+            if prev_page:
+                prev_text = prev_page.content
+                if len(prev_text) > 500:  # Limit previous page content
+                    prev_text = "..." + prev_text[-500:]
+                content_parts.append(f"[Context from page {page_number - 1}]\n{prev_text}\n")
 
-        # Get current page
-        current_page = doc[page_number - 1]  # 0-indexed
-        current_text = current_page.get_text()
-        content_parts.append(f"[Current page {page_number}]\n{current_text}\n")
+        # Add current page
+        content_parts.append(f"[Current page {page_number}]\n{current_page.content}\n")
 
         # Get next page for context (if exists)
-        if page_number < doc.page_count:
-            next_page = doc[page_number]  # 0-indexed
-            next_text = next_page.get_text()
+        next_page = session.exec(
+            select(PDFPage).where(
+                (PDFPage.course_id == course_id) &
+                (PDFPage.page_number == page_number + 1)
+            )
+        ).first()
+        if next_page:
+            next_text = next_page.content
             if len(next_text) > 500:  # Limit next page content
                 next_text = next_text[:500] + "..."
             content_parts.append(f"[Context from page {page_number + 1}]\n{next_text}")
-
-        doc.close()
 
         page_content = "\n".join(content_parts)
 
@@ -96,7 +98,7 @@ def _extract_page_content_from_pdf(course_id: int, page_number: int, session: Se
         return page_content
 
     except Exception as e:
-        logger.warning(f"Failed to extract PDF content: {e}")
+        logger.warning(f"Failed to extract PDF content from database: {e}")
         # Fallback to text-based extraction
         return _extract_page_content(course.raw_text or "", page_number)
 
@@ -121,12 +123,13 @@ def _extract_page_content(course_text: str, page_number: int, context_pages: int
     return page_content
 
 
-def _generate_ai_response(message: str, page_content: str, page_number: int,
-                         conversation_history: List[ChatMessage]) -> str:
-    """Generate AI tutor response using OpenAI API."""
+def _generate_ai_response_stream(message: str, page_content: str, page_number: int,
+                                 conversation_history: List[ChatMessage]):
+    """Generate streaming AI tutor response using OpenAI API."""
 
     if not should_use_ai():
-        return "I'm sorry, the AI tutoring feature is currently unavailable. Please try again later."
+        yield "data: I'm sorry, the AI tutoring feature is currently unavailable. Please try again later.\n\n"
+        return
 
     try:
         import openai
@@ -162,31 +165,38 @@ Always be encouraging and educational. If you're not sure about something specif
         # Add current message
         messages.append({"role": "user", "content": message})
 
-        response = client.chat.completions.create(
+        stream = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=messages,
-            max_tokens=500,
-            temperature=0.7
+            max_tokens=800,
+            temperature=0.7,
+            stream=True
         )
 
-        return response.choices[0].message.content or "I apologize, but I couldn't generate a response. Please try asking in a different way."
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                # Server-sent events format
+                yield f"data: {chunk.choices[0].delta.content}\n\n"
+
+        # Send done signal
+        yield "data: [DONE]\n\n"
 
     except ImportError:
         logger.error("OpenAI library not available")
-        return "AI tutoring requires the OpenAI library. Please contact support."
+        yield "data: AI tutoring requires the OpenAI library. Please contact support.\n\n"
     except Exception as e:
         logger.error("AI tutor error: %s", e)
-        return "I'm sorry, I'm having trouble processing your question right now. Please try again in a moment."
+        yield f"data: I'm sorry, I'm having trouble processing your question right now. Please try again in a moment.\n\n"
 
 
-@router.post("/{course_id}/ai-tutor", response_model=AITutorResponse)
-async def ai_tutor_chat(
+@router.post("/{course_id}/ai-tutor/stream")
+async def ai_tutor_chat_stream(
     course_id: int,
     request: AITutorRequest,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
-) -> AITutorResponse:
-    """AI tutor chat endpoint that provides contextual help based on the current PDF page."""
+):
+    """AI tutor streaming chat endpoint that provides contextual help based on the current PDF page."""
 
     # Get the course
     course = session.get(Course, course_id)
@@ -197,20 +207,26 @@ async def ai_tutor_chat(
     if course.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    # Extract relevant page content from PDF if available
+    # Extract relevant page content from stored PDF pages
     page_content = _extract_page_content_from_pdf(course_id, request.page_number, session)
 
     logger.info(
-        "AI tutor request: user_id=%s, course_id=%s, page=%s, message_length=%s",
+        "AI tutor stream request: user_id=%s, course_id=%s, page=%s, message_length=%s",
         current_user.id, course_id, request.page_number, len(request.message)
     )
 
-    # Generate AI response
-    ai_response = _generate_ai_response(
-        message=request.message,
-        page_content=page_content,
-        page_number=request.page_number,
-        conversation_history=request.conversation_history or []
+    # Return streaming response
+    return StreamingResponse(
+        _generate_ai_response_stream(
+            message=request.message,
+            page_content=page_content,
+            page_number=request.page_number,
+            conversation_history=request.conversation_history or []
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
     )
-
-    return AITutorResponse(response=ai_response)
