@@ -1,75 +1,53 @@
-# Summit MVP
+<div align="center">
+  <img src="frontend/public/images/logos/logo-full-black.svg" alt="Summit" width="200"/>
+  <h3>AI-Powered Learning Management Platform</h3>
+  <p>Upload your course materials, get AI-generated syllabi, quizzes, and assignments. Track your progress as you learn.</p>
+</div>
 
-A minimal FastAPI + Next.js app for notes.
+---
 
-## Stack
-- Backend: FastAPI, SQLModel (SQLite), Pytest
-- Frontend: Next.js (App Router, TS), Tailwind
+## ✨ Features
 
-## Getting started
+- **Smart Course Creation** – Upload PDFs or text files and get an AI-generated syllabus
+- **Auto-Generated Quizzes** – Practice with multiple-choice quizzes created from your course content
+- **AI Assignments** – Get short-answer assignments with automated grading
+- **Progress Tracking** – Mark items complete and track your learning journey
+- **Community Courses** – Share and discover courses from other learners
 
-### 1. Backend
+## 🚀 Quick Start
+
+### Backend
 ```bash
-# from repo root
 python3 -m venv .venv
-. .venv/bin/activate
+source .venv/bin/activate
 pip install -r backend/requirements.txt
-pytest
 uvicorn app.main:app --reload --port 8000 --app-dir backend
 ```
 
-### 2. Frontend
+### Frontend
 ```bash
-# from repo root
-cp frontend/.env.local.example frontend/.env.local
-npm --prefix frontend install
-npm --prefix frontend run dev
+cd frontend
+npm install
+npm run dev
 ```
-By default the frontend calls `http://localhost:8000`.
 
-### 3. Docker (optional)
+Visit `http://localhost:3000` and create an account to get started.
+
+### Docker (Optional)
 ```bash
 docker compose up --build
-# backend: http://localhost:8000/health
-# frontend: http://localhost:3000
 ```
 
-## API
-- `GET /health` → `{ "status": "ok" }`
-- `GET /notes` → list notes
-- `POST /notes` → create note `{ title, content }`
-- `GET /notes/{id}` → read
-- `PUT /notes/{id}` → update `{ title?, content? }`
-- `DELETE /notes/{id}` → delete
+## 🛠️ Tech Stack
 
-### Auth
-- `POST /auth/register` `{ email, password }`
-- `POST /auth/login` `{ email, password }` → `{ access_token }`
-- `GET /auth/me` (Bearer token)
+- **Backend**: FastAPI, SQLModel, SQLite
+- **Frontend**: Next.js 14, TypeScript, Tailwind CSS
+- **AI**: OpenAI GPT for content generation
 
-### Courses
-- `GET /courses/` (Bearer) → list courses
-- `POST /courses/upload` (multipart: `file` (.txt/.pdf), `title`) (Bearer) → course with syllabus
-- `GET /courses/{id}` (Bearer) → course with syllabus
+## 📹 Demo
 
-### Quizzes
-- `POST /courses/{course_id}/quizzes/generate` (Bearer) → create a naive quiz from syllabus
-- `GET /courses/{course_id}/quizzes` (Bearer) → list quizzes for a course
-- `GET /courses/quizzes/{quiz_id}` (Bearer) → quiz with questions
-- `POST /courses/quizzes/{quiz_id}/submit` (Bearer, body: `[number]`) → `{ score, total, correct_indices }`
+<!-- Add your demo video here -->
 
-### Assignments (short-answer, naive)
-- `POST /courses/{course_id}/assignments/generate` (Bearer) → create 1-3 short-answer prompts
-- `GET /courses/{course_id}/assignments` (Bearer) → list assignments
-- `GET /courses/assignments/{assignment_id}` (Bearer) → assignment with prompts
-- `POST /courses/assignments/{assignment_id}/submit` (Bearer, body: `[string]`) → `{ score, total }`
+---
 
-### Progress
-- `GET /courses/{course_id}/progress` (Bearer) → `{ total_items, completed_count, completed_item_ids }`
-- `POST /courses/{course_id}/progress/{syllabus_item_id}/toggle` (Bearer) → returns updated summary
-
-## Next steps
-- Basic editing UI for notes
-- Empty state illustrations & UX polish
-- CI: lint/test on push
-- Docker compose for full stack
+Built with ❤️ for better learning
