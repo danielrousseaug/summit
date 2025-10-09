@@ -1,0 +1,36 @@
+services:
+  backend:
+    env_file:
+      - .env
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: summit-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend:rw
+      # Persist the SQLite DB at the container path the app actually uses (WORKDIR=/app)
+      - ./notes.db:/app/notes.db
+      # Persist storage (e.g., uploaded PDFs)
+      - ./storage:/app/storage:rw
+    environment:
+      - PYTHONUNBUFFERED=1
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-prod}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - AI_DEBUG_LOG=${AI_DEBUG_LOG:-1}
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: summit-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
