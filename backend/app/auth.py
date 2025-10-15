@@ -5,7 +5,7 @@ import os
 from typing import Optional
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from sqlmodel import Session, select
@@ -43,8 +43,11 @@ def create_access_token(subject: str, expires_minutes: int = ACCESS_TOKEN_EXPIRE
 def get_current_user(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(http_bearer),
     session: Session = Depends(get_session),
+    token_q: Optional[str] = Query(default=None, alias="token"),
+    access_token_q: Optional[str] = Query(default=None, alias="access_token"),
 ) -> User:
-    token = creds.credentials if creds is not None else None
+    # Support Authorization header or fallback to token/access_token query param (for embeddable resources like PDFs)
+    token = creds.credentials if creds is not None else (token_q or access_token_q)
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     try:
