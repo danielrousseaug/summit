@@ -1,0 +1,1330 @@
+================================================================================
+SUMMIT AI LEARNING PLATFORM - COMPLETE FRONTEND REDESIGN PLAN
+================================================================================
+
+PROJECT OVERVIEW
+================================================================================
+
+Summit is an AI-powered personalized learning platform that transforms textbooks
+and PDFs into structured courses with automatically generated syllabi, quizzes,
+assignments, and progress tracking. The current MVP has basic functionality but
+lacks modern UI/UX design.
+
+CURRENT STATE ANALYSIS
+================================================================================
+
+What Summit Currently Does:
+- AI-powered course creation from uploaded textbooks/PDFs
+- Automated syllabus generation with personalized learning paths
+- Quiz & assignment generation with AI scoring
+- Progress tracking and scheduling system
+- User profiles with learning preferences
+- Basic note-taking functionality
+
+Current UI/UX Issues:
+- Minimal styling with only basic Tailwind CSS
+- No cohesive design system or consistent theming
+- Poor visual hierarchy and information architecture
+- Lack of modern components and smooth interactions
+- Basic error handling and user feedback
+- No mobile optimization or responsive design
+- Limited accessibility features
+
+RECOMMENDED TECH STACK & LIBRARIES
+================================================================================
+
+Core UI Framework:
+- shadcn/ui - Modern component library built on Radix UI + Tailwind CSS
+- Radix UI Primitives - Accessible, unstyled component primitives
+- Lucide React - Beautiful, consistent icon library (2000+ icons)
+- Class Variance Authority (cva) - Component variant management
+- Tailwind CSS - Utility-first CSS framework (already in use)
+
+Enhanced UX Libraries:
+- Framer Motion - Smooth animations and micro-interactions
+- React Hook Form + Zod - Robust form handling with validation
+- Sonner - Modern toast notifications (replace react-hot-toast)
+- cmdk - Command palette for power users (Cmd+K functionality)
+- TanStack Query - Advanced data fetching, caching, and synchronization
+
+Visual & Data Libraries:
+- Recharts - Progress charts, analytics, and data visualization
+- React Dropzone - Enhanced file upload experience with drag & drop
+- React Markdown - Rich text content display and rendering
+- next-themes - Seamless dark/light theme system
+- React PDF - PDF viewing and annotation capabilities
+
+Additional Utilities:
+- date-fns - Date manipulation and formatting
+- clsx/cn - Conditional className utility
+- react-use - Collection of essential React hooks
+- react-hotkeys-hook - Keyboard shortcut management
+
+DETAILED PAGE-BY-PAGE REDESIGN SPECIFICATIONS
+================================================================================
+
+1. LANDING/WELCOME PAGE (New Addition)
+================================================================================
+
+Current State: Application immediately shows notes interface after login
+Proposed Design: Professional marketing landing page
+
+Header Section:
+- Modern navigation bar with logo and auth buttons
+- Clean, minimal design with proper spacing
+- Responsive mobile hamburger menu
+
+Hero Section:
+- Compelling headline: "Transform Any Textbook Into Your Personal AI Tutor"
+- Subheading explaining the AI-powered course generation
+- Large, prominent "Get Started Free" CTA button
+- Hero illustration or demo video showing the platform in action
+- Trust indicators (testimonials, user count, etc.)
+
+Features Section:
+- Grid layout showcasing key features:
+  * AI Course Generation - Upload textbook, get instant syllabus
+  * Smart Quizzes - Automatically generated questions with explanations
+  * Progress Tracking - Visual analytics of learning journey
+  * Personalized Learning - Adaptive content based on your pace
+- Each feature with icon, title, description, and visual mockup
+
+How It Works Section:
+- 3-step process visualization:
+  1. Upload your textbook or learning material
+  2. AI analyzes and creates personalized course structure
+  3. Start learning with quizzes, assignments, and tracking
+- Interactive demo or animated walkthrough
+
+Social Proof Section:
+- User testimonials with photos and credentials
+- Statistics: courses created, hours learned, success stories
+- Integration logos if applicable
+
+Footer:
+- Links to documentation, privacy policy, contact
+- Social media links and company information
+
+Technical Implementation:
+- Server-side rendering for SEO optimization
+- Smooth scroll animations between sections
+- Progressive image loading for performance
+- Mobile-first responsive design
+- Accessibility compliance (WCAG 2.1 AA)
+
+2. AUTHENTICATION PAGE
+================================================================================
+
+Current State: Basic form with minimal styling and toggle between login/register
+Proposed Design: Modern, secure authentication experience
+
+Layout Design:
+- Split-screen layout (desktop) / stacked layout (mobile)
+- Left side: Branding section with gradient background
+  * Company logo and tagline
+  * Rotating testimonials or feature highlights
+  * Artistic illustration or abstract design
+- Right side: Authentication form card
+
+Form Design:
+- Elegant card container with subtle shadow
+- Clear form title with welcome message
+- Input fields with floating labels and proper focus states
+- Password field with show/hide toggle
+- Remember me checkbox with proper accessibility
+- Primary CTA button with loading states
+- Secondary link to switch between login/register
+
+Enhanced Features:
+- Smooth animated transitions between login and register modes
+- Real-time form validation with helpful error messages
+- Password strength indicator for registration
+- Social authentication options (Google, GitHub)
+- "Magic link" email authentication option
+- Forgot password flow with clear instructions
+
+Security & UX:
+- Proper error handling without revealing sensitive information
+- Loading states during authentication process
+- Success feedback before redirect
+- Keyboard navigation support
+- Screen reader accessibility
+
+Mobile Optimization:
+- Touch-friendly input sizes and spacing
+- Optimized keyboard types (email, password)
+- Proper viewport handling for iOS Safari
+
+3. ONBOARDING FLOW (New Addition)
+================================================================================
+
+Purpose: Guide new users through initial setup and feature introduction
+Trigger: First login after registration
+
+Step 1: Welcome & Goal Setting
+- Personalized welcome message with user's name
+- Question: "What do you want to learn?"
+- Multiple choice options: Academic subjects, Professional skills, Personal interest
+- Optional text input for specific goals
+
+Step 2: Learning Preferences
+- Time commitment slider: "How many hours per week can you dedicate?"
+- Learning pace preference: Self-paced vs Structured timeline
+- Difficulty preference: Beginner, Intermediate, Advanced
+- Preferred content types: Reading, Quizzes, Assignments, All
+
+Step 3: First Course Setup
+- Upload your first textbook/PDF with guided instructions
+- Drag & drop zone with clear instructions
+- Sample files available for demo purposes
+- Real-time processing feedback with explanations
+
+Step 4: Platform Tour
+- Interactive walkthrough of key features
+- Highlight navigation elements
+- Show where to find courses, quizzes, progress tracking
+- Tooltip-style explanations with next/previous controls
+
+Step 5: Quick Start
+- Display newly created course from uploaded material
+- Encourage first action: "Take your first quiz" or "Start reading"
+- Option to skip to dashboard or continue with guided experience
+
+Implementation Details:
+- Multi-step wizard with progress indicator
+- Smooth transitions between steps
+- Ability to go back and modify previous answers
+- Skip options for experienced users
+- Progress saved if user exits and returns
+- Mobile-responsive design for all steps
+
+4. DASHBOARD/HOME PAGE
+================================================================================
+
+Current State: Simple course list with basic progress indicators
+Proposed Design: Comprehensive learning hub with rich analytics and quick actions
+
+Header/Navigation:
+- Collapsible sidebar with user avatar and navigation menu
+- Main sections: Dashboard, Courses, Quizzes, Assignments, Profile
+- Search bar for quick content finding
+- Notification bell with unread indicators
+- User dropdown with profile, settings, logout options
+
+Hero Section:
+- Personalized welcome message: "Welcome back, [Name]!"
+- Current learning streak counter with flame icon
+- Today's learning goal progress bar
+- Weather-based greeting or motivational quote
+
+Quick Actions Panel:
+- Large, prominent action buttons:
+  * "Upload New Course" with plus icon
+  * "Continue Learning" with play icon
+  * "Take Practice Quiz" with brain icon
+  * "Review Assignments" with clipboard icon
+- Each button with hover animations and quick previews
+
+Learning Progress Overview:
+- Weekly/monthly progress charts using Recharts
+- Circular progress indicators for active courses
+- Learning streak visualization
+- Time spent learning today/this week
+- Goals completion percentage
+
+Active Courses Section:
+- Card-based grid layout (responsive: 3 columns desktop, 1-2 mobile)
+- Each course card includes:
+  * AI-generated cover image or PDF thumbnail
+  * Course title and subject tag
+  * Progress ring showing completion percentage
+  * Next due assignment or quiz with date
+  * "Continue Learning" button
+  * Options menu (edit, delete, share)
+- Hover effects with elevated shadows
+- Empty state with "Upload your first course" prompt
+
+Recent Activity Feed:
+- Timeline-style activity log:
+  * "Completed Quiz #3 in Calculus - Score: 85%"
+  * "Started new chapter: Linear Algebra Basics"
+  * "Uploaded new course: Physics Fundamentals"
+- Activity icons and timestamps
+- Option to filter by activity type
+
+Learning Statistics Widget:
+- Weekly hours completed vs. goal
+- Average quiz scores with trend indicators
+- Courses completed this month
+- Total learning time accumulated
+- Achievements and badges earned
+
+Upcoming Schedule:
+- Calendar widget showing next 7 days
+- Due assignments and quiz deadlines
+- Scheduled study sessions
+- Color-coded by priority and course
+
+Mobile Optimizations:
+- Collapsible sections to reduce scrolling
+- Swipeable course cards
+- Touch-friendly interactive elements
+- Optimized chart displays for small screens
+
+5. COURSES PAGE
+================================================================================
+
+Current State: Simple list with basic upload form
+Proposed Design: Rich course library with advanced management features
+
+Page Header:
+- Page title with course count: "Your Courses (12)"
+- View toggle buttons: Grid view (default) / List view
+- Search bar with filters dropdown
+- Sort options: Recent, Progress, A-Z, Subject
+- "Upload New Course" prominent button
+
+Enhanced Course Upload:
+- Large drag & drop zone with visual feedback
+- Accepted file types clearly displayed (.pdf, .txt, .epub)
+- Multiple file upload support
+- Upload progress bars with file names
+- File validation and error handling
+
+Upload Modal/Form:
+- Course title input (auto-populated from filename)
+- Subject/category selection dropdown
+- Learning objectives text area
+- Focus topics specification
+- Difficulty level selector
+- Estimated completion time
+- Course visibility settings (private/shared)
+
+AI Processing Feedback:
+- Real-time status updates during processing:
+  * "Analyzing document structure..."
+  * "Extracting key concepts..."
+  * "Generating personalized syllabus..."
+  * "Creating practice questions..."
+- Progress bar with estimated time remaining
+- Option to continue browsing while processing
+
+Course Grid Layout:
+- Responsive card grid (4 cols desktop, 2 tablet, 1 mobile)
+- Each course card features:
+  * Large cover image area (auto-generated or custom)
+  * Course title and subtitle
+  * Subject tag/badge
+  * Progress indicator (circular with percentage)
+  * Key metrics: lessons, quizzes, assignments
+  * Last accessed date
+  * Star rating (self-assessment)
+  * Options menu (edit, duplicate, archive, delete)
+
+Course Card Hover States:
+- Elevated shadow animation
+- Preview information overlay
+- Quick action buttons appear
+- Smooth color transitions
+
+Filtering and Search:
+- Subject category filters with counts
+- Progress filters: Not Started, In Progress, Completed
+- Difficulty level filters
+- Date range filters
+- Search within course content
+- Saved filter presets
+
+List View Alternative:
+- Compact table layout for power users
+- Sortable columns: Title, Progress, Last Access, Created
+- Bulk actions: archive, delete, export
+- Inline editing for quick title changes
+
+Empty States:
+- Engaging illustration for new users
+- Clear call-to-action to upload first course
+- Sample courses available for demo
+- Tutorial link for getting started
+
+Advanced Features:
+- Course duplication with modification options
+- Export course data and progress
+- Course sharing with generated links
+- Bulk operations with selection checkboxes
+- Favorite courses for quick access
+
+6. COURSE DETAIL PAGE
+================================================================================
+
+Current State: Basic syllabus with checkboxes and simple links
+Proposed Design: Comprehensive course hub with rich content organization
+
+Course Header Section:
+- Hero banner with course cover image
+- Course title, subtitle, and description
+- Key metadata: Subject, Difficulty, Estimated time
+- Overall progress bar with completion percentage
+- Action buttons: Continue Learning, Take Quiz, View Assignments
+- Course options menu: Edit, Share, Export, Archive
+
+Navigation Tabs:
+- Overview (default) - Course syllabus and progress
+- Schedule - Calendar view with deadlines
+- Resources - Files, links, and generated materials
+- Analytics - Detailed progress and performance data
+- Settings - Course preferences and customization
+
+Overview Tab - Enhanced Syllabus:
+- Interactive timeline/roadmap visualization
+- Each syllabus item as expandable card:
+  * Lesson title and estimated time
+  * Rich description with key concepts
+  * Completion checkbox with visual feedback
+  * Progress indicator for partially completed items
+  * Associated readings with page numbers
+  * Generated summary and learning objectives
+  * Quick access to related quizzes/assignments
+- Visual progress indicators connecting items
+- "Next Up" highlighting for current focus
+
+Syllabus Item Details:
+- Expandable sections revealing:
+  * Detailed learning objectives
+  * Key concepts and terminology
+  * Recommended readings with page ranges
+  * Related quiz questions preview
+  * Assignment prompts if available
+  * AI-generated study tips
+  * Estimated completion time
+  * Prerequisites and follow-up topics
+
+Reading Integration:
+- Embedded PDF viewer for course materials
+- Page-specific annotations and highlights
+- Reading progress tracking per section
+- Bookmarking system for important pages
+- Search within course documents
+- Note-taking sidebar with auto-save
+
+Schedule Tab:
+- Calendar view (monthly/weekly/daily)
+- Due date visualization for all course items
+- Drag & drop rescheduling capability
+- Integration with personal calendar systems
+- Deadline reminders and notifications
+- Study session scheduling
+- Progress milestone markers
+
+Resources Tab:
+- Uploaded course files with organization
+- AI-generated study materials:
+  * Concept summaries
+  * Flashcards
+  * Practice questions
+  * Key term glossaries
+- External links and references
+- Student-created notes and annotations
+- Downloadable resources (PDF, text, audio)
+- Resource sharing and collaboration tools
+
+Analytics Tab:
+- Detailed progress charts and insights:
+  * Time spent per topic
+  * Quiz performance by subject area
+  * Learning velocity and projections
+  * Strength and weakness analysis
+- Comparative performance metrics
+- Goal tracking and achievement progress
+- Study habit analysis and recommendations
+- Export options for progress data
+
+Floating Action Elements:
+- Quick access toolbar for common actions
+- AI chat assistant (bottom-right bubble)
+- Progress save indicator
+- Bookmark current position
+- Share current section
+- Print or export current view
+
+Mobile Optimizations:
+- Collapsible navigation tabs
+- Touch-friendly timeline interactions
+- Optimized PDF viewer for mobile
+- Swipe gestures for navigation
+- Compressed analytics displays
+
+7. QUIZ INTERFACE
+================================================================================
+
+Current State: Basic form with radio buttons and minimal feedback
+Proposed Design: Engaging, interactive quiz experience with rich feedback
+
+Quiz Selection/Overview:
+- Available quizzes displayed as cards
+- Each quiz card shows:
+  * Quiz title and topic coverage
+  * Number of questions and estimated time
+  * Difficulty level indicators
+  * Previous attempt scores (if any)
+  * "Start Quiz" or "Retake Quiz" buttons
+- Quiz generation button with AI status
+- Filter options: By topic, difficulty, completion status
+
+Pre-Quiz Screen:
+- Quiz title and description
+- Instructions and rules clearly stated
+- Time limit information with timer preview
+- Question count and point values
+- Tips for success and test-taking strategies
+- "Start Quiz" button with confidence building message
+
+Quiz Taking Interface:
+- Clean, focused design minimizing distractions
+- Progress bar showing current question position
+- Question counter: "Question 5 of 15"
+- Timer display (if applicable) with color coding
+- Question card with proper typography and spacing
+- Answer options with clear visual selection states
+- Navigation buttons: Previous, Next, Flag for Review
+- Save progress indicator
+
+Question Types Support:
+- Multiple choice with radio buttons
+- Multiple answer with checkboxes
+- True/False with visual toggle
+- Short answer with text input
+- Matching exercises with drag & drop
+- Fill-in-the-blank with input fields
+- Image-based questions with zoom capability
+
+Interactive Elements:
+- Smooth transitions between questions
+- Animation feedback for answer selection
+- Visual confirmation of saved answers
+- Hover states and focus indicators
+- Keyboard navigation support (arrow keys, spacebar)
+- Accessibility features for screen readers
+
+Review and Submission:
+- Question overview grid showing status:
+  * Answered (green check)
+  * Skipped (yellow warning)
+  * Flagged (red flag)
+- Click to jump to specific questions
+- Final review before submission
+- Confirmation dialog for quiz submission
+- Option to save progress and continue later
+
+Results and Feedback:
+- Immediate score display with celebration animation
+- Detailed breakdown by topic/category
+- Question-by-question review:
+  * Correct answers highlighted
+  * Explanations for incorrect choices
+  * Learning tips and additional resources
+- Performance comparison with previous attempts
+- Suggestions for improvement and study focus
+- Option to retake quiz or continue to next topic
+
+Quiz History and Analytics:
+- Historical performance tracking
+- Score trends over time with charts
+- Time spent per quiz and question type
+- Accuracy improvements visualization
+- Weak areas identification
+- Study recommendations based on performance
+
+Advanced Features:
+- Adaptive difficulty based on performance
+- Hint system for challenging questions
+- Bookmarking questions for later review
+- Collaborative features (study group challenges)
+- Export results and certificates of completion
+
+8. ASSIGNMENTS PAGE
+================================================================================
+
+Current State: Basic list with simple submission forms
+Proposed Design: Comprehensive assignment management with rich editing tools
+
+Assignment Overview:
+- Card-based layout for all assignments
+- Each assignment card includes:
+  * Title and brief description
+  * Due date with urgency color coding
+  * Completion status and progress indicator
+  * Difficulty level and estimated time
+  * Point value and grading rubric preview
+  * Quick action buttons: Start, Continue, Submit, Review
+
+Assignment Dashboard:
+- Filter and sort options:
+  * By course, due date, completion status
+  * Difficulty level and assignment type
+  * Search within assignment content
+- Calendar view integration showing due dates
+- Bulk actions for multiple assignments
+- Progress tracking across all assignments
+
+Individual Assignment View:
+- Assignment header with full description
+- Learning objectives and requirements clearly stated
+- Grading criteria and rubric display
+- Related course materials and resources
+- Time tracking for work sessions
+- Auto-save functionality for all content
+
+Rich Text Editor:
+- Modern WYSIWYG editor with formatting tools
+- Support for:
+  * Text formatting (bold, italic, headers)
+  * Lists, tables, and links
+  * Image and file embedding
+  * Code syntax highlighting
+  * Mathematical equation support (LaTeX)
+  * Citation and reference management
+- Real-time word count and character limits
+- Spell check and grammar suggestions
+- Version history and revision tracking
+
+File Attachment System:
+- Drag & drop file upload interface
+- Support for multiple file types (docs, images, PDFs)
+- File preview and thumbnail generation
+- Virus scanning and security validation
+- Organization into folders within assignments
+- Collaborative file sharing capabilities
+
+Submission Process:
+- Clear submission requirements checklist
+- Progress indicator for completion status
+- Draft saving with timestamps
+- Submission confirmation with receipt
+- Late submission warnings and policies
+- Option to withdraw and re-submit
+
+AI-Powered Feedback:
+- Real-time writing assistance and suggestions
+- Grammar and style recommendations
+- Content relevance scoring
+- Plagiarism detection and citations
+- Readability analysis and improvements
+- Learning objective alignment checking
+
+Grading and Results:
+- Detailed feedback from AI scoring
+- Rubric-based evaluation display
+- Scores breakdown by criteria
+- Improvement suggestions and resources
+- Comparison with class/course averages
+- Option to request human review or appeal
+
+Assignment History:
+- Complete submission history with versions
+- Performance tracking over time
+- Feedback incorporation and improvement
+- Archived assignments for reference
+- Export capabilities for portfolio building
+
+Collaboration Features:
+- Peer review assignments and feedback
+- Group project management tools
+- Real-time collaborative editing
+- Comment and annotation system
+- Discussion threads for clarification
+
+9. PROFILE/SETTINGS PAGE
+================================================================================
+
+Current State: Simple form with basic learning preferences
+Proposed Design: Comprehensive user management with rich customization options
+
+Profile Section:
+- Large avatar display with upload/editing tools
+- User information: Name, email, join date
+- Learning statistics and achievements:
+  * Total courses completed
+  * Hours of learning time
+  * Quiz average scores
+  * Current learning streak
+  * Badges and certifications earned
+- Social profile elements (optional):
+  * Learning goals and interests
+  * Favorite subjects and topics
+  * Study group participation
+  * Public profile visibility settings
+
+Learning Preferences:
+- Visual time allocation interface:
+  * Weekly hours slider with visual feedback
+  * Preferred study times (morning, afternoon, evening)
+  * Session length preferences
+  * Break frequency and duration
+- Learning style assessment:
+  * Visual, auditory, kinesthetic preferences
+  * Self-paced vs. structured learning
+  * Individual vs. group study preferences
+  * Challenge level comfort zone
+
+Goals and Motivation:
+- SMART goal setting interface:
+  * Specific learning objectives
+  * Measurable progress targets
+  * Achievable milestone definitions
+  * Relevant skill development focus
+  * Time-bound completion dates
+- Progress tracking and visualization
+- Motivational reminders and encouragements
+- Achievement celebration system
+
+Account Settings:
+- Theme selection with live preview:
+  * Light theme
+  * Dark theme
+  * Auto (system preference)
+  * Custom color schemes
+- Notification preferences:
+  * Email notifications (daily, weekly, never)
+  * Push notifications for mobile
+  * Reminder settings for deadlines
+  * Achievement and milestone alerts
+  * Study session reminders
+
+Privacy and Security:
+- Password change with strength validation
+- Two-factor authentication setup
+- Login history and active sessions
+- Data privacy controls:
+  * Learning data sharing preferences
+  * Analytics opt-in/opt-out
+  * Third-party integration permissions
+- Account deletion and data export options
+
+Subscription and Billing:
+- Current plan details and usage
+- Upgrade/downgrade options with comparisons
+- Billing history and invoice downloads
+- Payment method management
+- Usage analytics and limits
+- Referral program participation
+
+Data Management:
+- Learning data export in multiple formats
+- Course backup and restore options
+- Progress synchronization across devices
+- Offline content management
+- Integration with external tools:
+  * Google Drive/Dropbox for file storage
+  * Calendar applications for scheduling
+  * Note-taking apps for content sync
+
+Accessibility Settings:
+- Font size and contrast adjustments
+- Screen reader optimization preferences
+- Keyboard navigation customization
+- Color blind accessibility options
+- Motion sensitivity controls
+- Language and localization settings
+
+10. READING INTERFACE (Enhanced)
+================================================================================
+
+Current State: Basic page navigation with minimal features
+Proposed Design: Immersive reading experience with advanced study tools
+
+PDF Viewer Integration:
+- High-quality document rendering with zoom controls
+- Smooth scrolling and page navigation
+- Thumbnail sidebar for quick page jumps
+- Search functionality within documents
+- Bookmarking system with custom labels
+- Full-screen reading mode
+- Print and download options
+
+Annotation Tools:
+- Highlighting system with color coding:
+  * Yellow for important concepts
+  * Green for definitions and key terms
+  * Red for critical information
+  * Blue for questions and confusion points
+- Text annotation and note-taking:
+  * Sticky note style comments
+  * Longer form annotations with rich text
+  * Voice note recording for mobile users
+  * Drawing and sketching tools for diagrams
+- Tag system for organizing annotations
+
+Reading Progress Tracking:
+- Page-by-page progress indicators
+- Reading time estimation and actual tracking
+- Comprehension checkpoints with mini-quizzes
+- Reading speed analysis and improvement tips
+- Session history and reading habits analytics
+- Integration with course syllabus progress
+
+Study Companion Features:
+- AI-powered content summarization:
+  * Chapter summaries automatically generated
+  * Key concept extraction and definition
+  * Important formula and equation highlighting
+- Interactive glossary and terminology:
+  * Hover definitions for technical terms
+  * Expandable explanations with examples
+  * Audio pronunciations for complex terms
+- Related content suggestions:
+  * Links to relevant quiz questions
+  * Connection to assignment topics
+  * References to other course materials
+
+Note-Taking Integration:
+- Sidebar note-taking interface:
+  * Rich text editor with formatting
+  * Auto-saving with cloud synchronization
+  * Organization by chapter and topic
+  * Search within personal notes
+- Linking system between notes and document sections
+- Export options for notes (PDF, Word, Markdown)
+- Collaboration features for study groups
+
+Reading Aids and Accessibility:
+- Adjustable font sizes and line spacing
+- Night mode and color theme options
+- Text-to-speech functionality with natural voices
+- Reading ruler and focus tools
+- Dyslexia-friendly font options
+- Translation tools for foreign language content
+
+Mobile Reading Experience:
+- Optimized touch navigation and gestures
+- Swipe to turn pages naturally
+- Pinch-to-zoom with smooth animations
+- Offline reading capability with sync
+- Reduced eye strain features
+- Battery optimization for long reading sessions
+
+11. NOTES SYSTEM (Enhanced)
+================================================================================
+
+Current State: Basic CRUD operations with minimal organization
+Proposed Design: Comprehensive knowledge management system
+
+Note Creation and Editing:
+- Rich text editor with extensive formatting options:
+  * Standard formatting (bold, italic, underline, strikethrough)
+  * Headings, lists, and block quotes
+  * Code blocks with syntax highlighting
+  * Tables with resizable columns
+  * Mathematical equations with LaTeX support
+  * Embedding images, videos, and files
+- Markdown support with live preview mode
+- Auto-save functionality with version history
+- Distraction-free writing mode
+
+Organization System:
+- Hierarchical folder structure with drag & drop
+- Tagging system with autocomplete suggestions
+- Color coding and label system
+- Search functionality with advanced filters:
+  * Search by content, title, tags, date
+  * Boolean search operators
+  * Saved search queries
+- Favorites and recent notes quick access
+- Archive system for completed topics
+
+Course Integration:
+- Link notes directly to specific course sections
+- Auto-categorization by course and topic
+- Integration with reading assignments and highlights
+- Connection to quiz questions and explanations
+- Assignment reference and citation system
+- Progress tracking for note-taking goals
+
+Collaboration Features:
+- Share individual notes or entire notebooks
+- Real-time collaborative editing
+- Comment and suggestion system
+- Version control with merge capabilities
+- Study group note sharing
+- Public note sharing for community learning
+
+AI-Powered Enhancements:
+- Automatic summarization of lengthy notes
+- Key point extraction and highlighting
+- Content organization suggestions
+- Related note recommendations
+- Grammar and writing style improvements
+- Concept connection and relationship mapping
+
+Templates and Productivity:
+- Pre-designed note templates:
+  * Cornell note-taking system
+  * Mind mapping templates
+  * Study guide formats
+  * Meeting notes and agendas
+- Custom template creation and sharing
+- Quick capture tools for mobile users
+- Voice-to-text transcription capabilities
+
+Export and Backup:
+- Multiple export formats (PDF, Word, Markdown, HTML)
+- Bulk export with folder structure preservation
+- Cloud storage integration (Google Drive, Dropbox, OneDrive)
+- Local backup and restore functionality
+- Print-friendly formatting options
+
+12. ANALYTICS DASHBOARD (New Addition)
+================================================================================
+
+Purpose: Provide detailed insights into learning patterns and performance
+Access: Dedicated section in main navigation
+
+Learning Overview:
+- Comprehensive dashboard with key performance indicators:
+  * Total learning time (daily, weekly, monthly)
+  * Courses in progress and completion rates
+  * Average quiz scores and improvement trends
+  * Goal achievement progress
+- Customizable dashboard widgets and layout
+- Date range selectors for temporal analysis
+- Quick insights and AI-generated recommendations
+
+Progress Visualization:
+- Interactive charts and graphs:
+  * Learning time trends over weeks/months
+  * Course completion timeline
+  * Quiz score improvements by subject
+  * Study session frequency and duration
+- Progress comparison with personal goals
+- Milestone achievement tracking
+- Streak maintenance and consistency metrics
+
+Performance Analysis:
+- Detailed quiz and assignment analytics:
+  * Score distributions by topic and difficulty
+  * Time spent per question type
+  * Most challenging concepts identification
+  * Improvement areas with specific recommendations
+- Learning efficiency metrics
+- Retention and recall analysis
+- Comparative performance across different subjects
+
+Study Habits Insights:
+- Optimal learning time identification:
+  * Most productive hours of the day
+  * Best performing days of the week
+  * Session length effectiveness analysis
+- Distraction and break pattern analysis
+- Learning method effectiveness comparison
+- Environmental factor correlations
+
+Goal Tracking:
+- Visual progress toward set learning goals
+- SMART goal breakdown and milestone tracking
+- Achievement celebration and badge system
+- Goal adjustment recommendations based on progress
+- Historical goal setting and completion analysis
+
+Predictive Analytics:
+- AI-powered learning path optimization
+- Estimated completion times for courses
+- Difficulty prediction for upcoming content
+- Success probability for upcoming assessments
+- Personalized study schedule recommendations
+
+Export and Reporting:
+- Comprehensive learning reports (PDF, CSV)
+- Progress sharing capabilities
+- Integration with external analytics tools
+- Historical data preservation and analysis
+- Custom report generation with specific metrics
+
+DESIGN SYSTEM SPECIFICATIONS
+================================================================================
+
+Color Palette:
+Primary Colors:
+- Primary Blue: #3B82F6 (main brand color)
+- Primary Blue Dark: #1D4ED8 (hover states, dark theme)
+- Primary Blue Light: #93C5FD (backgrounds, light accents)
+
+Secondary Colors:
+- Success Green: #059669 (completed items, positive feedback)
+- Warning Yellow: #D97706 (pending items, cautions)
+- Error Red: #DC2626 (errors, urgent items)
+- Info Purple: #7C3AED (premium features, special content)
+
+Neutral Colors:
+- Gray 50: #F9FAFB (background, subtle elements)
+- Gray 100: #F3F4F6 (card backgrounds, separators)
+- Gray 200: #E5E7EB (borders, inactive elements)
+- Gray 400: #9CA3AF (placeholder text, disabled states)
+- Gray 600: #4B5563 (secondary text)
+- Gray 800: #1F2937 (primary text)
+- Gray 900: #111827 (headings, high contrast text)
+
+Typography:
+Font Families:
+- Headings: Inter (weights: 400, 500, 600, 700)
+- Body Text: System font stack (-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif)
+- Code/Monospace: JetBrains Mono, 'Fira Code', Consolas, monospace
+
+Type Scale:
+- Text XS: 12px / 16px line height
+- Text SM: 14px / 20px line height
+- Text Base: 16px / 24px line height
+- Text LG: 18px / 28px line height
+- Text XL: 20px / 28px line height
+- Text 2XL: 24px / 32px line height
+- Text 3XL: 30px / 36px line height
+- Text 4XL: 36px / 40px line height
+
+Spacing System:
+- Space 1: 4px (0.25rem)
+- Space 2: 8px (0.5rem)
+- Space 3: 12px (0.75rem)
+- Space 4: 16px (1rem)
+- Space 5: 20px (1.25rem)
+- Space 6: 24px (1.5rem)
+- Space 8: 32px (2rem)
+- Space 10: 40px (2.5rem)
+- Space 12: 48px (3rem)
+- Space 16: 64px (4rem)
+- Space 20: 80px (5rem)
+- Space 24: 96px (6rem)
+
+Border Radius:
+- Rounded SM: 2px (subtle rounding)
+- Rounded Base: 4px (default buttons, inputs)
+- Rounded MD: 6px (cards, modals)
+- Rounded LG: 8px (large cards, containers)
+- Rounded XL: 12px (hero sections, major containers)
+- Rounded 2XL: 16px (prominent cards, special containers)
+- Rounded Full: 9999px (pills, avatars, badges)
+
+Shadow System:
+- Shadow SM: 0 1px 2px 0 rgba(0, 0, 0, 0.05)
+- Shadow Base: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)
+- Shadow MD: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)
+- Shadow LG: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)
+- Shadow XL: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)
+
+Component Specifications:
+Buttons:
+- Primary: Blue background, white text, medium padding, rounded base
+- Secondary: White background, blue border and text, medium padding
+- Tertiary: Transparent background, blue text, minimal padding
+- Sizes: Small (8px/16px padding), Medium (12px/24px), Large (16px/32px)
+- States: Default, hover (darker), active (pressed), disabled (faded)
+
+Form Elements:
+- Inputs: White background, gray border, rounded base, focus ring
+- Labels: Medium font weight, slightly smaller than input text
+- Validation: Green for success, red for errors, yellow for warnings
+- Help text: Small gray text below inputs
+
+Cards:
+- Background: White with subtle border or shadow
+- Padding: 24px for content, 16px for compact cards
+- Hover state: Elevated shadow, slight scale increase
+- Border radius: MD for standard cards, LG for prominent ones
+
+Navigation:
+- Sidebar: Fixed width, dark background, white text
+- Breadcrumbs: Gray text with blue links, separator characters
+- Tabs: Underlined active state, hover effects
+- Pagination: Numbered buttons with prev/next navigation
+
+Animation Guidelines:
+Timing Functions:
+- Ease Out: cubic-bezier(0, 0, 0.2, 1) - For entering animations
+- Ease In: cubic-bezier(0.4, 0, 1, 1) - For exiting animations
+- Ease In Out: cubic-bezier(0.4, 0, 0.2, 1) - For transitions
+
+Duration Standards:
+- Micro-interactions: 150ms (button hovers, focus states)
+- Component transitions: 300ms (modal open/close, tab switching)
+- Page transitions: 500ms (route changes, major view updates)
+- Loading states: 1000ms+ (with progress indicators)
+
+Animation Types:
+- Fade: Opacity transitions for content showing/hiding
+- Slide: Positional transitions for panels and menus
+- Scale: Size transitions for hover effects and emphasis
+- Rotate: Rotational effects for loading spinners and icons
+
+Responsive Breakpoints:
+- Mobile: 320px - 767px (single column layouts)
+- Tablet: 768px - 1023px (two column layouts)
+- Desktop: 1024px - 1439px (three column layouts)
+- Large Desktop: 1440px+ (four+ column layouts with more spacing)
+
+Mobile-First Approach:
+- Start with mobile design and progressively enhance
+- Touch-friendly minimum sizes (44px for interactive elements)
+- Simplified navigation with hamburger menus
+- Optimized images and content for smaller screens
+- Consider thumb reach and one-handed usage
+
+Accessibility Standards:
+- WCAG 2.1 AA compliance for all components
+- Minimum 4.5:1 contrast ratio for text
+- Keyboard navigation for all interactive elements
+- Screen reader support with proper ARIA labels
+- Focus indicators clearly visible
+- Alternative text for all images and media
+
+IMPLEMENTATION STRATEGY
+================================================================================
+
+Phase 1: Foundation Setup (Week 1-2)
+Priority: Establish design system and core infrastructure
+
+Technical Setup:
+1. Install and configure shadcn/ui component library
+2. Set up design tokens in Tailwind configuration
+3. Install supporting libraries (Framer Motion, Lucide Icons, etc.)
+4. Configure theme system with next-themes
+5. Set up component architecture and folder structure
+
+Design System Implementation:
+1. Create base components (Button, Input, Card, etc.)
+2. Implement color palette and typography system
+3. Set up spacing and layout utilities
+4. Create animation utilities and presets
+5. Establish responsive breakpoint system
+
+Core Layout Components:
+1. Header/Navigation component with user menu
+2. Sidebar navigation with collapsible sections
+3. Main layout wrapper with proper spacing
+4. Footer component with essential links
+5. Loading states and error boundary components
+
+Testing and Quality:
+1. Set up component testing with Jest and Testing Library
+2. Implement accessibility testing with axe-core
+3. Create visual regression testing with Chromatic
+4. Set up linting rules for consistency
+5. Configure pre-commit hooks for code quality
+
+Phase 2: Authentication and Onboarding (Week 3-4)
+Priority: User entry points and first impressions
+
+Landing Page Development:
+1. Create marketing hero section with compelling copy
+2. Build features showcase with interactive elements
+3. Implement "How It Works" section with animations
+4. Add testimonials and social proof elements
+5. Optimize for SEO and performance
+
+Authentication Redesign:
+1. Implement split-screen authentication layout
+2. Create animated transitions between login/register
+3. Add social authentication integration
+4. Build password strength and validation system
+5. Implement magic link authentication flow
+
+Onboarding Flow Creation:
+1. Design multi-step wizard with progress indicators
+2. Create goal-setting and preference collection forms
+3. Build interactive platform tour with tooltips
+4. Implement first course upload guidance
+5. Add skip and back navigation options
+
+User Experience Enhancements:
+1. Add smooth page transitions throughout app
+2. Implement proper loading states for async operations
+3. Create comprehensive error handling and messaging
+4. Add success feedback and confirmation systems
+5. Optimize mobile responsiveness for all new screens
+
+Phase 3: Core Learning Experience (Week 5-6)
+Priority: Primary user workflows and daily usage
+
+Dashboard Redesign:
+1. Create comprehensive learning overview with widgets
+2. Implement progress visualization with charts
+3. Build quick actions panel with prominent CTAs
+4. Add recent activity feed with timeline design
+5. Create responsive course card grid layout
+
+Course Management Enhancement:
+1. Redesign course upload with drag & drop interface
+2. Implement AI processing status and feedback
+3. Create advanced filtering and search capabilities
+4. Build course card hover states and interactions
+5. Add course organization and management tools
+
+Course Detail Page Overhaul:
+1. Create tabbed interface for course information
+2. Implement interactive syllabus timeline
+3. Build reading integration with PDF viewer
+4. Add schedule calendar with drag & drop rescheduling
+5. Create analytics tab with detailed insights
+
+Reading Experience Enhancement:
+1. Integrate advanced PDF viewer with annotation tools
+2. Implement highlighting and note-taking system
+3. Create reading progress tracking and analytics
+4. Add AI-powered content summarization
+5. Build mobile-optimized reading interface
+
+Phase 4: Assessment and Analytics (Week 7-8)
+Priority: Learning validation and insights
+
+Quiz Interface Redesign:
+1. Create modern quiz-taking interface with animations
+2. Implement multiple question types with proper UX
+3. Build comprehensive results and feedback system
+4. Add quiz history and performance tracking
+5. Create adaptive difficulty and hint systems
+
+Assignment Management:
+1. Implement rich text editor for assignment submissions
+2. Create file attachment and management system
+3. Build AI-powered feedback and grading system
+4. Add peer review and collaboration features
+5. Implement assignment analytics and insights
+
+Analytics Dashboard Creation:
+1. Build comprehensive learning analytics overview
+2. Create interactive charts for progress visualization
+3. Implement study habits analysis and insights
+4. Add goal tracking and achievement system
+5. Create export and reporting capabilities
+
+Notes System Enhancement:
+1. Implement rich text editor with advanced features
+2. Create hierarchical organization system
+3. Build search and filtering capabilities
+4. Add course integration and linking system
+5. Implement collaboration and sharing features
+
+Phase 5: Polish and Optimization (Week 9-10)
+Priority: Performance, accessibility, and user delight
+
+Performance Optimization:
+1. Implement code splitting and lazy loading
+2. Optimize images and assets for web delivery
+3. Add service worker for offline functionality
+4. Implement proper caching strategies
+5. Optimize bundle size and loading times
+
+Accessibility Improvements:
+1. Conduct comprehensive accessibility audit
+2. Implement keyboard navigation throughout app
+3. Add proper ARIA labels and screen reader support
+4. Create high contrast theme option
+5. Test with assistive technologies
+
+Mobile Experience Refinement:
+1. Optimize touch interactions and gestures
+2. Implement responsive navigation patterns
+3. Add mobile-specific features (swipe, pull-to-refresh)
+4. Optimize performance for mobile devices
+5. Test across various device sizes and browsers
+
+Advanced Features:
+1. Implement command palette (Cmd+K) for power users
+2. Add keyboard shortcuts throughout the application
+3. Create advanced search across all content
+4. Implement real-time collaboration features
+5. Add integration with external tools and services
+
+DEVELOPMENT BEST PRACTICES
+================================================================================
+
+Code Organization:
+```
+src/
+├── components/
+│   ├── ui/              # shadcn/ui base components
+│   ├── layout/          # Layout-specific components
+│   ├── course/          # Course-related components
+│   ├── quiz/            # Quiz-specific components
+│   ├── auth/            # Authentication components
+│   └── shared/          # Reusable business components
+├── lib/
+│   ├── api.ts           # API client and utilities
+│   ├── auth.ts          # Authentication logic
+│   ├── utils.ts         # General utility functions
+│   └── validations.ts   # Form validation schemas
+├── hooks/               # Custom React hooks
+├── stores/              # State management (Zustand)
+├── styles/              # Global styles and Tailwind config
+└── types/               # TypeScript type definitions
+```
+
+Component Architecture Principles:
+1. Single Responsibility: Each component has one clear purpose
+2. Composition over Inheritance: Use composition patterns
+3. Props Interface: Clear, typed interfaces for all props
+4. Default Props: Sensible defaults for optional props
+5. Error Boundaries: Proper error handling at component level
+
+State Management Strategy:
+1. Server State: React Query for API data and caching
+2. Client State: Zustand for global application state
+3. Form State: React Hook Form for complex forms
+4. URL State: Next.js router for navigation state
+5. Local State: useState for component-specific state
+
+Styling Approach:
+1. Utility-First: Tailwind CSS for rapid development
+2. Component Variants: Class Variance Authority for component variants
+3. Design Tokens: Centralized design system configuration
+4. CSS Modules: For complex animations and custom styles
+5. Responsive Design: Mobile-first approach with breakpoints
+
+Performance Considerations:
+1. Code Splitting: Dynamic imports for route-based splitting
+2. Image Optimization: Next.js Image component with proper sizing
+3. Bundle Analysis: Regular bundle size monitoring
+4. Lazy Loading: Defer loading of below-fold content
+5. Memoization: React.memo and useMemo for expensive operations
+
+Testing Strategy:
+1. Unit Tests: Individual component and utility testing
+2. Integration Tests: Component interaction testing
+3. E2E Tests: Critical user flow testing with Playwright
+4. Visual Regression: Component visual consistency testing
+5. Accessibility Tests: Automated a11y testing in CI/CD
+
+Security Considerations:
+1. Input Validation: Client and server-side validation
+2. XSS Prevention: Proper content sanitization
+3. CSRF Protection: Token-based request validation
+4. Content Security Policy: Restrict resource loading
+5. Dependency Security: Regular vulnerability scanning
+
+MAINTENANCE AND SCALABILITY
+================================================================================
+
+Documentation Standards:
+1. Component Documentation: Storybook for component library
+2. API Documentation: OpenAPI specifications for backend
+3. User Documentation: Comprehensive user guides and tutorials
+4. Developer Documentation: Setup, deployment, and contribution guides
+5. Design Documentation: Design system and pattern library
+
+Monitoring and Analytics:
+1. Error Tracking: Sentry for runtime error monitoring
+2. Performance Monitoring: Web vitals and user experience metrics
+3. Usage Analytics: Privacy-compliant user behavior tracking
+4. A/B Testing: Feature flag system for experimentation
+5. Uptime Monitoring: Service availability and response time tracking
+
+Future Enhancement Opportunities:
+1. Progressive Web App: Offline functionality and app-like experience
+2. Mobile Applications: React Native or native mobile apps
+3. AI Chatbot: Integrated learning assistant with NLP
+4. Social Learning: Study groups and peer interaction features
+5. Gamification: Achievement system and learning competitions
+6. Advanced Analytics: Machine learning insights and predictions
+7. Integration Ecosystem: Third-party tool connections and APIs
+8. Multilingual Support: Internationalization and localization
+9. Accessibility Plus: Advanced accessibility features beyond compliance
+10. Voice Interface: Voice commands and audio-based learning
+
+This comprehensive redesign plan transforms Summit from a basic MVP into a modern, engaging, and scalable learning platform that prioritizes user experience, accessibility, and performance while maintaining the core AI-powered educational functionality.
