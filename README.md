@@ -50,4 +50,4 @@ docker compose up --build
 
 ---
 
-Built with ❤️ for better learning
+Built for better learning
