@@ -279,6 +279,130 @@ def generate_quiz_from_titles(titles: List[str], num_questions: int = 5, use_ai:
     return generate_quiz_from_content(title, content, num_questions, use_ai)
 
 
+def generate_flashcards_from_content(section_title: str, section_content: str, num_cards: int = 12, use_ai: bool = False) -> List[Dict[str, Any]]:
+    """Generate flashcards from section content.
+
+    Returns a list of flashcard dictionaries with:
+    - front: str (question or term)
+    - back: str (answer or definition)
+    - card_type: str ("qa" or "term_definition")
+    """
+    if not use_ai or not _has_key():
+        logger.info("generate_flashcards_from_content: using fallback (use_ai=%s, has_key=%s)", use_ai, _has_key())
+        # Fallback: extract key sentences as flashcards
+        sentences = [s.strip() for s in section_content.split('.') if len(s.strip()) > 20]
+        out: list[Dict[str, Any]] = []
+        for idx, sentence in enumerate(sentences[:num_cards]):
+            # Create simple Q&A from sentences
+            words = sentence.split()
+            if len(words) > 5:
+                # Make a question from the sentence
+                front = f"What does this statement mean: {' '.join(words[:8])}...?"
+                back = sentence
+                out.append({
+                    "front": front[:200],
+                    "back": back[:300],
+                    "card_type": "qa"
+                })
+        if not out:
+            out.append({
+                "front": f"What is the main topic of {section_title}?",
+                "back": section_title,
+                "card_type": "qa"
+            })
+        return out[:num_cards]
+
+    try:
+        from openai import OpenAI  # type: ignore
+
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        logger.info("generate_flashcards_from_content: using AI model=%s, section=%r, num_cards=%d",
+                   model, section_title[:60], num_cards)
+
+        # Limit content to avoid token limits
+        content_excerpt = section_content[:8000]
+
+        prompt = f"""Create {num_cards} flashcards for studying this content. Mix Q&A format and Term/Definition format based on what's most appropriate.
+
+Section: {section_title}
+
+For Q&A cards: front should be a question, back should be the answer
+For Term/Definition cards: front should be a key term, back should be its definition
+
+Return ONLY a JSON array (no code fences, no extra text):
+[
+  {{
+    "front": "Question or Term",
+    "back": "Answer or Definition",
+    "card_type": "qa" or "term_definition"
+  }}
+]
+
+CONTENT:
+{content_excerpt}
+
+Generate {num_cards} flashcards:"""
+
+        if os.getenv("AI_DEBUG_LOG") == "1":
+            logger.debug("="*80)
+            logger.debug("GENERATE_FLASHCARDS_FROM_CONTENT - START")
+            logger.debug("Section Title: %s", section_title)
+            logger.debug("Content Length: %d characters", len(content_excerpt))
+            logger.debug("Number of Cards Requested: %d", num_cards)
+            logger.debug("-"*40)
+            logger.debug("PROMPT:")
+            logger.debug(prompt)
+            logger.debug("-"*40)
+
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are a flashcard generator. Return only valid JSON array with no additional text or code fences."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.4,
+        )
+
+        content = resp.choices[0].message.content or "[]"
+        if os.getenv("AI_DEBUG_LOG") == "1":
+            logger.debug("RESPONSE FROM MODEL (%s):", model)
+            logger.debug(content)
+            logger.debug("GENERATE_FLASHCARDS_FROM_CONTENT - END")
+            logger.debug("="*80)
+
+        data = _try_parse_json(content) or []
+        out: list[Dict[str, Any]] = []
+
+        for obj in data[:num_cards]:
+            front = str(obj.get("front", ""))[:200]
+            back = str(obj.get("back", ""))[:300]
+            card_type = str(obj.get("card_type", "qa"))
+
+            # Validate card_type
+            if card_type not in ["qa", "term_definition"]:
+                card_type = "qa"
+
+            if not front or not back:
+                continue
+
+            out.append({
+                "front": front,
+                "back": back,
+                "card_type": card_type,
+            })
+
+        if len(out) < num_cards:
+            logger.warning(f"Only generated {len(out)} flashcards out of {num_cards} requested")
+
+        return out[:num_cards]
+
+    except Exception as e:
+        logger.warning("generate_flashcards_from_content: AI path failed; falling back", exc_info=True)
+
+    return generate_flashcards_from_content(section_title, section_content[:500], num_cards=min(num_cards, 5), use_ai=False)
+
+
 def generate_assignments_from_titles(titles: List[str], max_q: int = 3, use_ai: bool = False) -> List[Dict[str, str]]:
     if not use_ai or not _has_key():
         logger.info("generate_assignments_from_titles: using fallback (use_ai=%s, has_key=%s)", use_ai, _has_key())

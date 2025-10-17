@@ -20,6 +20,7 @@ from .routes_progress import router as progress_router
 from .routes_profile import router as profile_router
 from .routes_assignments import router as assignments_router
 from .routes_ai_tutor import router as ai_tutor_router
+from .routes_flashcards import router as flashcards_router
 
 
 @asynccontextmanager
@@ -98,6 +99,7 @@ app.include_router(progress_router)
 app.include_router(profile_router)
 app.include_router(assignments_router)
 app.include_router(ai_tutor_router)
+app.include_router(flashcards_router)
 
 
 @app.get("/health")

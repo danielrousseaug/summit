@@ -5,6 +5,7 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CourseWithSyllabus } from "@/types/course";
 import type { Quiz } from "@/types/quiz";
+import type { Flashcard } from "@/types/flashcard";
 import { useAuth } from "@/lib/auth";
 import { Schedule } from "@/components/Schedule";
 import PDFViewer from "@/components/PDFViewer";
@@ -29,7 +30,8 @@ import {
   BookMarked,
   FileQuestion,
   Plus,
-  Loader2
+  Loader2,
+  Layers
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import toast from "react-hot-toast";
@@ -138,18 +140,122 @@ function QuizzesSection({
   );
 }
 
+// Flashcards Section Component
+function FlashcardsSection({
+  courseId,
+  flashcards,
+  loading,
+  onGenerateFlashcards,
+  generatingFlashcards
+}: {
+  courseId: string;
+  flashcards: Flashcard[];
+  loading: boolean;
+  onGenerateFlashcards: () => Promise<void>;
+  generatingFlashcards: boolean;
+}) {
+  if (loading && flashcards.length === 0) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <Card key={i} className="shadow-sm border border-gray-100 dark:border-gray-700">
+            <CardContent className="p-6">
+              <div className="animate-pulse">
+                <div className="bg-gray-200 dark:bg-gray-700 h-5 w-32 rounded mb-2" />
+                <div className="bg-gray-200 dark:bg-gray-700 h-4 w-48 rounded" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (flashcards.length === 0) {
+    return (
+      <Card className="shadow-sm border border-gray-100 dark:border-gray-700 text-center py-12">
+        <CardContent>
+          <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-gray-100 dark:bg-gray-800 mx-auto mb-4">
+            <Layers className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No flashcard sets yet</h3>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">Generate your first flashcard set to study key concepts</p>
+          <Button
+            onClick={onGenerateFlashcards}
+            disabled={generatingFlashcards}
+            className="bg-gray-900 hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 cursor-pointer"
+          >
+            {generatingFlashcards ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating Flashcards...
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4 mr-2" />
+                Generate Flashcards
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {flashcards.map((fc) => (
+        <Card key={fc.id} className="shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-all duration-200">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                    {fc.syllabus_item_title ? `Flashcards - ${fc.syllabus_item_title}` : `Flashcard Set #${fc.id}`}
+                  </h3>
+                  <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300 mb-3">
+                    <div className="flex items-center gap-1">
+                      <BookOpen className="w-4 h-4" />
+                      <span>{fc.num_cards} cards</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      <span>Created {new Date(fc.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    Ready to study
+                  </Badge>
+                </div>
+              </div>
+              <div className="ml-6 flex-shrink-0">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/courses/${courseId}/flashcards/${fc.id}`} className="flex items-center gap-2">
+                    <Play className="w-4 h-4" />
+                    Study Cards
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 export default function CourseDetailPage() {
   const { auth } = useAuth();
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [course, setCourse] = useState<CourseWithSyllabus | null>(null);
-  const [readings, setReadings] = useState<Array<{ id: number; order_index: number; title: string; start_page: number; end_page: number }>>([]);
+  const [readings, setReadings] = useState<Array<{ id: number; order_index: number; title: string; start_page: number; end_page: number; syllabus_item_id?: number }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [completedIds, setCompletedIds] = useState<number[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'pdf' | 'quizzes' | 'minimal'>(() => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'pdf' | 'quizzes' | 'flashcards' | 'minimal'>(() => {
     const tab = searchParams.get('tab');
-    if (tab === 'quizzes' || tab === 'pdf' || tab === 'minimal') {
+    if (tab === 'quizzes' || tab === 'pdf' || tab === 'minimal' || tab === 'flashcards') {
       return tab;
     }
     return 'overview';
@@ -159,6 +265,10 @@ export default function CourseDetailPage() {
   const [loadingQuizzes, setLoadingQuizzes] = useState(false);
   const [generatingQuiz, setGeneratingQuiz] = useState(false);
   const [generatingQuizForItem, setGeneratingQuizForItem] = useState<number | null>(null);
+  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  const [loadingFlashcards, setLoadingFlashcards] = useState(false);
+  const [generatingFlashcards, setGeneratingFlashcards] = useState(false);
+  const [generatingFlashcardsForItem, setGeneratingFlashcardsForItem] = useState<number | null>(null);
 
   // Debug scroll monitoring
   useEffect(() => {
@@ -266,6 +376,54 @@ export default function CourseDetailPage() {
     }
   }, [params?.id, router]);
 
+  const fetchFlashcards = useCallback(async () => {
+    if (!params?.id || !auth.token) return;
+    try {
+      setLoadingFlashcards(true);
+      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/courses/${params.id}/flashcards`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        cache: "no-store",
+      });
+      if (!resp.ok) throw new Error("Failed to load flashcards");
+      const list = (await resp.json()) as Flashcard[];
+      setFlashcards(list);
+    } catch (e: unknown) {
+      console.error("Failed to load flashcards", e);
+    } finally {
+      setLoadingFlashcards(false);
+    }
+  }, [params?.id, auth.token]);
+
+  useEffect(() => {
+    // Always fetch flashcards when the component mounts to show correct button states
+    fetchFlashcards();
+  }, [fetchFlashcards]);
+
+  useEffect(() => {
+    if (activeTab === 'flashcards') {
+      fetchFlashcards();
+    }
+  }, [activeTab, fetchFlashcards]);
+
+  const handleGenerateFlashcards = useCallback(async () => {
+    if (!params?.id) return;
+    try {
+      setGeneratingFlashcards(true);
+      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/courses/${params.id}/flashcards/generate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (!resp.ok) throw new Error("Failed to generate flashcards");
+      const created = (await resp.json()) as Flashcard;
+      toast.success("Flashcards generated successfully!");
+      // Redirect to the newly created flashcard set
+      router.push(`/courses/${params.id}/flashcards/${created.id}`);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to generate flashcards");
+      setGeneratingFlashcards(false);
+    }
+  }, [params?.id, router]);
+
   if (!auth.token) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-6">
@@ -338,7 +496,7 @@ export default function CourseDetailPage() {
 
             // Preserve scroll position when switching tabs
             const currentScrollY = window.scrollY;
-            setActiveTab(v as 'overview' | 'pdf' | 'quizzes');
+            setActiveTab(v as 'overview' | 'pdf' | 'quizzes' | 'flashcards');
 
             // Prevent automatic scrolling after state update
             requestAnimationFrame(() => {
@@ -355,7 +513,7 @@ export default function CourseDetailPage() {
               });
             }, 100);
           }} className="mb-6">
-            <TabsList className="grid w-fit grid-cols-3">
+            <TabsList className="grid w-fit grid-cols-4">
               <TabsTrigger value="overview" className="flex items-center gap-2 cursor-pointer">
                 <BookMarked className="w-4 h-4" />
                 Course Overview
@@ -367,6 +525,10 @@ export default function CourseDetailPage() {
               <TabsTrigger value="quizzes" className="flex items-center gap-2 cursor-pointer">
                 <Brain className="w-4 h-4" />
                 Quizzes
+              </TabsTrigger>
+              <TabsTrigger value="flashcards" className="flex items-center gap-2 cursor-pointer">
+                <Layers className="w-4 h-4" />
+                Flashcards
               </TabsTrigger>
             </TabsList>
 
@@ -447,7 +609,7 @@ export default function CourseDetailPage() {
                               {relatedReadings.length > 0 && (
                                 <div className="space-y-2">
                                   {relatedReadings.map((reading) => (
-                                    <div key={reading.id} className="flex items-center gap-2 text-sm">
+                                    <div key={reading.id} className="flex items-center flex-wrap gap-2 text-sm">
                                       <Button
                                         variant="outline"
                                         size="sm"
@@ -539,6 +701,71 @@ export default function CourseDetailPage() {
                                         );
                                       })()}
 
+                                      {/* Flashcard Button inline - only show for the last reading of this section */}
+                                      {reading === relatedReadings[relatedReadings.length - 1] && (() => {
+                                        const existingFlashcard = flashcards.find(fc => fc.syllabus_item_id === item.id);
+                                        return existingFlashcard ? (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                              router.push(`/courses/${params?.id}/flashcards/${existingFlashcard.id}`);
+                                            }}
+                                            className="flex items-center gap-2 cursor-pointer"
+                                          >
+                                            <Play className="w-4 h-4" />
+                                            Open Flashcards
+                                          </Button>
+                                        ) : (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={async () => {
+                                              try {
+                                                setGeneratingFlashcardsForItem(item.id);
+                                                const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+                                                const token = localStorage.getItem("token");
+                                                const headers = { Authorization: `Bearer ${token}` };
+                                                const url = `${base}/courses/${params?.id}/flashcards/generate`;
+
+                                                const resp = await fetch(url, {
+                                                  method: "POST",
+                                                  headers: { ...headers, "Content-Type": "application/json" },
+                                                  body: JSON.stringify({ syllabus_item_id: item.id }),
+                                                  cache: "no-store"
+                                                });
+
+                                                if (!resp.ok) throw new Error(`Failed to generate flashcards: ${resp.status} ${resp.statusText}`);
+                                                const created = await resp.json();
+
+                                                await fetchFlashcards(); // Refresh flashcard list
+                                                router.push(`/courses/${params?.id}/flashcards/${created.id}`);
+                                                toast.success('Flashcards generated successfully!');
+                                              } catch (e) {
+                                                console.error("Generate Flashcards Error:", e);
+                                                toast.error(`Failed to generate flashcards: ${e instanceof Error ? e.message : 'Unknown error'}`);
+                                              } finally {
+                                                setGeneratingFlashcardsForItem(null);
+                                              }
+                                            }}
+                                            disabled={generatingFlashcardsForItem === item.id}
+                                            className="flex items-center gap-2 cursor-pointer"
+                                          >
+                                            {generatingFlashcardsForItem === item.id ? (
+                                              <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                Generating...
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Layers className="w-4 h-4" />
+                                                Generate Flashcards
+                                              </>
+                                            )}
+                                          </Button>
+                                        );
+                                      })()}
+
                                     </div>
                                   ))}
                                 </div>
@@ -616,6 +843,75 @@ export default function CourseDetailPage() {
                                           <>
                                             <Brain className="w-4 h-4" />
                                             Generate Quiz
+                                          </>
+                                        )}
+                                      </Button>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Show flashcard button if no related readings exist */}
+                              {relatedReadings.length === 0 && (() => {
+                                const existingFlashcard = flashcards.find(fc => fc.syllabus_item_id === item.id);
+                                return (
+                                  <div className="mt-2">
+                                    {existingFlashcard ? (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          router.push(`/courses/${params?.id}/flashcards/${existingFlashcard.id}`);
+                                        }}
+                                        className="flex items-center gap-2 cursor-pointer"
+                                      >
+                                        <Play className="w-4 h-4" />
+                                        Open Flashcards
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={async () => {
+                                          try {
+                                            setGeneratingFlashcardsForItem(item.id);
+                                            const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+                                            const token = localStorage.getItem("token");
+                                            const headers = { Authorization: `Bearer ${token}` };
+                                            const url = `${base}/courses/${params?.id}/flashcards/generate`;
+
+                                            const resp = await fetch(url, {
+                                              method: "POST",
+                                              headers: { ...headers, "Content-Type": "application/json" },
+                                              body: JSON.stringify({ syllabus_item_id: item.id }),
+                                              cache: "no-store"
+                                            });
+
+                                            if (!resp.ok) throw new Error(`Failed to generate flashcards: ${resp.status} ${resp.statusText}`);
+                                            const created = await resp.json();
+
+                                            await fetchFlashcards(); // Refresh flashcard list
+                                            router.push(`/courses/${params?.id}/flashcards/${created.id}`);
+                                            toast.success('Flashcards generated successfully!');
+                                          } catch (e) {
+                                            console.error("Generate Flashcards Error:", e);
+                                            toast.error(`Failed to generate flashcards: ${e instanceof Error ? e.message : 'Unknown error'}`);
+                                          } finally {
+                                            setGeneratingFlashcardsForItem(null);
+                                          }
+                                        }}
+                                        disabled={generatingFlashcardsForItem === item.id}
+                                        className="flex items-center gap-2 cursor-pointer"
+                                      >
+                                        {generatingFlashcardsForItem === item.id ? (
+                                          <>
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            Generating...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Layers className="w-4 h-4" />
+                                            Generate Flashcards
                                           </>
                                         )}
                                       </Button>
@@ -706,6 +1002,17 @@ export default function CourseDetailPage() {
                 loading={loadingQuizzes}
                 onGenerateQuiz={handleGenerateQuiz}
                 generatingQuiz={generatingQuiz}
+              />
+            </TabsContent>
+
+            {/* Flashcards Tab */}
+            <TabsContent value="flashcards" className="mt-6">
+              <FlashcardsSection
+                courseId={params?.id || ''}
+                flashcards={flashcards}
+                loading={loadingFlashcards}
+                onGenerateFlashcards={handleGenerateFlashcards}
+                generatingFlashcards={generatingFlashcards}
               />
             </TabsContent>
 
