@@ -374,6 +374,34 @@ def summarize_section(title: str, text: str, use_ai: bool = False) -> str:
         return f"Summary for {title}."
 
 
+async def summarize_section_async(title: str, text: str, use_ai: bool = False) -> str:
+    """Async version of summarize_section for parallel execution."""
+    if not use_ai or not _has_key():
+        # naive: first sentence clipped
+        plain = (text or "").strip().replace("\n", " ")
+        if not plain:
+            return f"Summary for {title}."
+        summary = plain.split(".")[0][:200]
+        return summary if summary else f"Summary for {title}."
+    try:
+        from openai import AsyncOpenAI  # type: ignore
+        client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        sys = "Return only a single concise summary <= 200 chars."
+        user = f"Title: {title}\n\nTEXT (sample):\n{text[:2000]}"
+        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
+        resp = await client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": sys}, {"role": "user", "content": user}],
+            temperature=0.2,
+        )
+        content = (resp.choices[0].message.content or "").strip()
+        return content[:200] if content else f"Summary for {title}."
+    except Exception:
+        logger.warning("summarize_section_async: AI path failed; falling back for title=%r", title[:80], exc_info=True)
+        return f"Summary for {title}."
+
+
 def extract_toc_from_text(text: str, max_items: int = 20, use_ai: bool = False) -> List[Dict[str, Any]]:
     """
     Ask the model to extract a Table of Contents from provided textbook text.
@@ -684,7 +712,7 @@ def extract_all_headers_from_pdf(pdf_path: str, total_pages: int) -> List[Dict[s
         return []
 
 
-def generate_intelligent_syllabus(pdf_path: str, total_pages: int, use_ai: bool = False, debug_log_path: str = None) -> List[Dict[str, Any]]:
+async def generate_intelligent_syllabus(pdf_path: str, total_pages: int, use_ai: bool = False, debug_log_path: str = None) -> List[Dict[str, Any]]:
     """
     Generate syllabus by:
     1. Extracting ALL large-font text from PDF with page numbers
@@ -696,6 +724,7 @@ def generate_intelligent_syllabus(pdf_path: str, total_pages: int, use_ai: bool 
     import fitz  # type: ignore
     from openai import OpenAI  # type: ignore
     from datetime import datetime
+    import asyncio
 
     # Setup dedicated debug log
     debug_lines = []
@@ -889,7 +918,13 @@ Return ONLY valid JSON array, no code fences or extra text."""
         data = _try_parse_json(content) or []
         result = []
 
+        # Check if enhanced summaries are enabled (default: disabled for speed)
+        enable_enhanced_summaries = os.getenv("ENABLE_ENHANCED_SUMMARIES", "false").lower() in ("true", "1", "yes")
+
         with fitz.open(pdf_path) as doc:
+            # First pass: collect all valid chapters with their base summaries
+            chapters_to_enhance = []
+
             for obj in data:
                 title = str(obj.get("title", "")).strip()[:120]
                 summary = str(obj.get("summary", "")).strip()[:250]
@@ -905,24 +940,58 @@ Return ONLY valid JSON array, no code fences or extra text."""
                     end_page = max(start_page, min(end_page, total_pages))
 
                     if title and summary:
-                        # Enhance summary by reading first page of chapter
-                        try:
-                            page_text = doc[start_page - 1].get_text()[:2000]
-                            enhanced_summary = summarize_section(title, page_text, use_ai=True)
-                            if enhanced_summary and len(enhanced_summary) > 20:
-                                summary = enhanced_summary
-                        except:
-                            pass
-
-                        result.append({
+                        chapter_data = {
                             "title": title,
                             "summary": summary,
                             "start_page": start_page,
-                            "end_page": end_page
-                        })
+                            "end_page": end_page,
+                            "page_text": None
+                        }
+
+                        # Extract first page text if enhanced summaries are enabled
+                        if enable_enhanced_summaries and use_ai:
+                            try:
+                                chapter_data["page_text"] = doc[start_page - 1].get_text()[:2000]
+                            except:
+                                pass
+
+                        chapters_to_enhance.append(chapter_data)
                 except (ValueError, TypeError):
                     logger.warning("generate_intelligent_syllabus: invalid page numbers: %s", obj)
                     continue
+
+            # Second pass: enhance summaries in parallel using async
+            if enable_enhanced_summaries and use_ai and chapters_to_enhance:
+                debug_log(f"STEP 3: Enhancing summaries for {len(chapters_to_enhance)} chapters in parallel...")
+
+                # Create async tasks for all chapters that have page text
+                async_tasks = []
+                task_indices = []
+
+                for i, chapter in enumerate(chapters_to_enhance):
+                    if chapter["page_text"]:
+                        async_tasks.append(
+                            summarize_section_async(chapter["title"], chapter["page_text"], use_ai=True)
+                        )
+                        task_indices.append(i)
+
+                # Run all summarizations in parallel
+                if async_tasks:
+                    enhanced_summaries = await asyncio.gather(*async_tasks)
+
+                    # Update chapters with enhanced summaries
+                    for task_idx, enhanced_summary in zip(task_indices, enhanced_summaries):
+                        if enhanced_summary and len(enhanced_summary) > 20:
+                            chapters_to_enhance[task_idx]["summary"] = enhanced_summary
+
+            # Build final result
+            for chapter in chapters_to_enhance:
+                result.append({
+                    "title": chapter["title"],
+                    "summary": chapter["summary"],
+                    "start_page": chapter["start_page"],
+                    "end_page": chapter["end_page"]
+                })
 
         if result and len(result) >= 3:
             debug_log("STEP 3: AI successfully identified chapters")

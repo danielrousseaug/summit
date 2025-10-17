@@ -29,8 +29,10 @@ export default function MinimalPDFViewer({
   const [totalPages, setTotalPages] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [showChat, setShowChat] = useState(true);
+  const [containerWidth, setContainerWidth] = useState(0);
   const pdfDocRef = useRef<any | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   let debugCounter = 0;
 
   const debugLog = (message: string, data?: any) => {
@@ -90,6 +92,45 @@ export default function MinimalPDFViewer({
     return () => { cancelled = true; };
   }, [courseId]);
 
+  // Watch for container resize
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Set initial width
+    const initialWidth = container.clientWidth;
+    setContainerWidth(initialWidth);
+    console.log('[PDF Resize] Initial container width:', initialWidth);
+
+    // Use a ref to track previous width to avoid stale closures
+    let prevWidth = initialWidth;
+
+    // Create ResizeObserver to detect container size changes
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const newWidth = entry.contentRect.width;
+        const widthDiff = Math.abs(newWidth - prevWidth);
+
+        // Update if width changed by at least 5px
+        if (widthDiff > 5) {
+          console.log('[PDF Resize] Width changed:', {
+            from: prevWidth,
+            to: newWidth,
+            diff: widthDiff
+          });
+          prevWidth = newWidth;
+          setContainerWidth(newWidth);
+        }
+      }
+    });
+
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []); // Empty deps - only set up once
+
   // Render page
   useEffect(() => {
     if (!pdfDocRef.current || !canvasRef.current || totalPages === 0) return;
@@ -99,15 +140,16 @@ export default function MinimalPDFViewer({
         const doc = pdfDocRef.current;
         const canvas = canvasRef.current;
         if (!doc || !canvas) return;
-        const container = canvas.parentElement;
+        const container = containerRef.current;
         if (!container) return;
 
         const pdfPage = await doc.getPage(page);
 
         // Calculate optimal scale to fit container width exactly
         const initialViewport = pdfPage.getViewport({ scale: 1 });
-        const availableWidth = container.clientWidth - 20; // Account for padding and border
-        const scale = Math.min(availableWidth / initialViewport.width, 2.0); // Max scale but fit to width
+        const currentWidth = containerWidth > 0 ? containerWidth : container.clientWidth;
+        const availableWidth = currentWidth - 20; // Account for padding and border
+        const scale = Math.min(availableWidth / initialViewport.width, 2.5);
 
         const viewport = pdfPage.getViewport({ scale });
         const context = canvas.getContext("2d");
@@ -133,7 +175,7 @@ export default function MinimalPDFViewer({
     };
 
     renderPage();
-  }, [page, totalPages]);
+  }, [page, totalPages, containerWidth]);
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
@@ -148,7 +190,10 @@ export default function MinimalPDFViewer({
       <Card className="flex-1 shadow-sm border border-gray-100 dark:border-gray-700">
         <CardContent className="p-0">
           {/* PDF Display Area */}
-          <div className="h-[80vh] overflow-auto bg-white dark:bg-gray-900 p-2">
+          <div
+            ref={containerRef}
+            className="h-[80vh] overflow-auto bg-white dark:bg-gray-900 p-2"
+          >
             <div className="flex justify-center w-full max-w-full">
               <canvas
                 ref={canvasRef}

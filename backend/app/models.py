@@ -313,3 +313,47 @@ class AssignmentSubmissionRead(SQLModel):
     created_at: datetime
     score: int
     total: int
+
+
+# --- Flashcards ---
+
+class Flashcard(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id")
+    syllabus_item_id: Optional[int] = Field(default=None, foreign_key="syllabusitem.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class FlashcardItem(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    flashcard_id: int = Field(foreign_key="flashcard.id")
+    order_index: int
+    front: str
+    back: str
+    card_type: str  # "qa" or "term_definition"
+
+
+class FlashcardRead(SQLModel):
+    id: int
+    course_id: int
+    syllabus_item_id: Optional[int] = None
+    syllabus_item_title: Optional[str] = None
+    created_at: datetime
+    num_cards: int
+
+
+class FlashcardItemRead(SQLModel):
+    id: int
+    order_index: int
+    front: str
+    back: str
+    card_type: str
+
+
+class FlashcardDetailRead(SQLModel):
+    id: int
+    course_id: int
+    syllabus_item_id: Optional[int] = None
+    syllabus_item_title: Optional[str] = None
+    created_at: datetime
+    cards: List[FlashcardItemRead]

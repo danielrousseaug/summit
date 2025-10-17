@@ -189,6 +189,101 @@ Always be encouraging and educational. If you're not sure about something specif
         yield f"data: I'm sorry, I'm having trouble processing your question right now. Please try again in a moment.\n\n"
 
 
+def _generate_ai_response(message: str, page_content: str, page_number: int,
+                          conversation_history: List[ChatMessage]) -> str:
+    """Generate non-streaming AI tutor response using OpenAI API."""
+
+    if not should_use_ai():
+        return "I'm sorry, the AI tutoring feature is currently unavailable. Please try again later."
+
+    try:
+        import openai
+        client = openai.OpenAI()
+
+        # Build conversation context
+        system_prompt = f"""You are a helpful AI tutor assisting a student with their course material.
+
+The student is currently reading page {page_number} of their course material. Here's the content from around that page:
+
+---
+{page_content}
+---
+
+Your role is to:
+1. Answer questions about the content clearly and helpfully
+2. Provide explanations and context when needed
+3. Suggest study strategies and tips
+4. Help the student understand complex concepts
+5. Keep responses concise but thorough (2-4 sentences usually)
+
+Always be encouraging and educational. If you're not sure about something specific to their course material, acknowledge that and focus on general principles that might help."""
+
+        messages = [{"role": "system", "content": system_prompt}]
+
+        # Add conversation history
+        for msg in conversation_history[-6:]:  # Last 6 messages for context
+            messages.append({
+                "role": msg.role,
+                "content": msg.content
+            })
+
+        # Add current message
+        messages.append({"role": "user", "content": message})
+
+        response = client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            messages=messages,
+            max_tokens=800,
+            temperature=0.7
+        )
+
+        return response.choices[0].message.content or "I couldn't generate a response. Please try again."
+
+    except ImportError:
+        logger.error("OpenAI library not available")
+        return "AI tutoring requires the OpenAI library. Please contact support."
+    except Exception as e:
+        logger.error("AI tutor error: %s", e)
+        return "I'm sorry, I'm having trouble processing your question right now. Please try again in a moment."
+
+
+@router.post("/{course_id}/ai-tutor", response_model=AITutorResponse)
+async def ai_tutor_chat(
+    course_id: int,
+    request: AITutorRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+) -> AITutorResponse:
+    """AI tutor chat endpoint that provides contextual help based on the current PDF page."""
+
+    # Get the course
+    course = session.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    # Verify user owns the course
+    if course.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    # Extract relevant page content from stored PDF pages
+    page_content = _extract_page_content_from_pdf(course_id, request.page_number, session)
+
+    logger.info(
+        "AI tutor request: user_id=%s, course_id=%s, page=%s, message_length=%s",
+        current_user.id, course_id, request.page_number, len(request.message)
+    )
+
+    # Generate AI response
+    response_text = _generate_ai_response(
+        message=request.message,
+        page_content=page_content,
+        page_number=request.page_number,
+        conversation_history=request.conversation_history or []
+    )
+
+    return AITutorResponse(response=response_text)
+
+
 @router.post("/{course_id}/ai-tutor/stream")
 async def ai_tutor_chat_stream(
     course_id: int,

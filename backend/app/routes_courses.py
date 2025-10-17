@@ -97,7 +97,7 @@ def get_course_status(course_id: int, current_user: User = Depends(get_current_u
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
-def upload_course(
+async def upload_course(
     file: UploadFile = File(...),
     title: str = Form(...),
     topics: str | None = Form(None),
@@ -206,7 +206,7 @@ def upload_course(
         update_status("ai_processing", "Generating syllabus with AI", 50)
 
         # Returns list of dicts with: {title, summary, start_page, end_page}
-        syllabus_data = generate_intelligent_syllabus(pdf_path, num_pages, use_ai=use_ai, debug_log_path=debug_log_path)
+        syllabus_data = await generate_intelligent_syllabus(pdf_path, num_pages, use_ai=use_ai, debug_log_path=debug_log_path)
 
         logger.info(f"Syllabus generation debug log saved to: {debug_log_path}")
 
